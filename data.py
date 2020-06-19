@@ -4,7 +4,7 @@ import torchvision.transforms as T
 import torchvision.datasets
 
 
-class MnistVectors(torch.utils.data.Dataset):
+class SketchyVectors(torch.utils.data.Dataset):
 
     def __init__(self, split='train'):
         super().__init__()
