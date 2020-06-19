@@ -44,7 +44,6 @@ class ImageDataSet(Dataset):
         self.get_class_numbers()
         self.__process_meta()
 
-
     def get_class_numbers(self):
         dict = {}
         for i, classname in enumerate(os.listdir(self.__sketch_dir)):
@@ -57,15 +56,16 @@ class ImageDataSet(Dataset):
             #label = self.class_numbers.get(classname)
             #if label is None:
             #    logger.error("Warning: Undefined class name {} in data directory {}".format(classname, self.__root_dir))
-            for filename in os.listdir(os.path.join(self.__sketch_dir, classname)):
-                path_sketch = os.path.join(self.__sketch_dir, classname, filename)
-                path_real = os.path.join(self.__real_dir, classname, filename.split("-")[0] + ".jpg")
-                if not os.path.exists(path_real):
-                    logger.error("Warning: Could not find real image named {} corresponding to sketch {}".format(path_real, path_sketch))
-                    continue
-                #if not self.load_on_request:
-                #    image = torch.from_numpy(cv2.imread(path))
-                self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classname]))
+            if os.path.isdir(os.path.join(self.__sketch_dir, classname)):
+                for filename in os.listdir(os.path.join(self.__sketch_dir, classname)):
+                    path_sketch = os.path.join(self.__sketch_dir, classname, filename)
+                    path_real = os.path.join(self.__real_dir, classname, filename.split("-")[0] + ".jpg")
+                    if not os.path.exists(path_real):
+                        logger.error("Warning: Could not find real image named {} corresponding to sketch {}".format(path_real, path_sketch))
+                        continue
+                    #if not self.load_on_request:
+                    #    image = torch.from_numpy(cv2.imread(path))
+                    self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classname]))
         print("Processed {} sketches".format(len(self.__meta)))
 
 
