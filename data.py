@@ -90,4 +90,6 @@ class ImageDataSet(Dataset):
         tensor_transform = torchvision.transforms.ToTensor()
         image = tensor_transform(image)
         sketch = tensor_transform(sketch)
+        #Make the background pixels black and brushstroke pixels white
+        sketch = (1 - sketch)
         return sketch, image, meta.get_class()
