@@ -17,24 +17,6 @@ from model import cINN
 from datetime import date
 import pprint
 
-# Determine, whether cuda will be enabled
-# use x.to_device(args.device)
-parser = argparse.ArgumentParser(description='PyTorch')
-parser.add_argument('--nocuda', action='store_true',
-                    help='Disable CUDA')
-args = parser.parse_args()
-device = None
-if not args.nocuda and torch.cuda.is_available():
-    device = torch.device('cuda')
-    print("CUDA enabled.")
-else:
-    device = torch.device('cpu')
-    print("CUDA disabled.")
-
-# Define dictionary of hyper parameters
-list_hyper_params = ["default.yaml"]
-
-
 def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     """
     Create dictionary from yaml file
@@ -142,11 +124,31 @@ def save_state(param, model_state, optim_state, epoch, running_loss, split, over
         'optimizer_state_dict': optim_state,
         'loss': running_loss,
         'train_split': split[0],
-        'test_split': split[1]
+        'test_split': split[1],
+        'model_params': param['model_params'],
+        'batch_size': param['batch_size'],
+        'test_ratio': param['test_ratio']
     }, f"{path}.tar")
 
 
 if __name__ == "__main__":
+    # Determine, whether cuda will be enabled
+    # use x.to_device(args.device)
+    parser = argparse.ArgumentParser(description='PyTorch')
+    parser.add_argument('--nocuda', action='store_true',
+                        help='Disable CUDA')
+    args = parser.parse_args()
+    device = None
+    if not args.nocuda and torch.cuda.is_available():
+        device = torch.device('cuda')
+        print("CUDA enabled.")
+    else:
+        device = torch.device('cpu')
+        print("CUDA disabled.")
+
+    # Define dictionary of hyper parameters
+    list_hyper_params = ["default.yaml"]
+
     # Loop over hyper parameter configurations
     pp = pprint.PrettyPrinter(indent=4)
     for param_name in list_hyper_params:
@@ -177,7 +179,6 @@ if __name__ == "__main__":
         for e in range(params["n_epochs"]):
             epoch += 1
             for batch, (sketch, real, label) in enumerate(tqdm(dataloader_train)):
-
                 sketch, real, label = sketch.to(device), real.to(device), label.to(device)
                 gauss_output = model(real, sketch)
                 loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / (gauss_output.shape[1]*gauss_output.shape[2] * gauss_output.shape[3])
