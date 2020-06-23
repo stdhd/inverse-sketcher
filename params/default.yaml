@@ -20,4 +20,4 @@ model_params: {dim_cond: [1,256,256], conv_size_cond: 3,
                permute_soft: False}
 
 model_name: "default"
-load_model: "default_0623_0"
+load_model: False
