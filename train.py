@@ -66,11 +66,7 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
     :param only_classes: optional list of folder names to retrieve training data from
     :return: train and test dataloaders and train and test split
     """
-<<<<<<< HEAD
-    data_set = data.ImageDataSet(root_dir=data_path, transform=get_transform())
-=======
-    data_set = data.ImageDataSet(root_dir=data_path, only_classes=only_classes)
->>>>>>> d079647030680e0c98cde2478ef207c7e20c7cf8
+    data_set = data.ImageDataSet(root_dir=data_path, transform=get_transform(), only_classes=only_classes)
     if split is None:
         train_split, test_split = torch.utils.data.random_split(data_set, [math.ceil(len(data_set) * (1-test_ratio)),
                                                                            math.floor(len(data_set) * test_ratio)])
