@@ -16,7 +16,8 @@ class AIO_Block(nn.Module):
                  permute_soft=False,
                  dropout=0.0,
                  num_layers=2,
-                 conv_size=None):
+                 conv_size=None,
+                 hidden_size=None):
 
         super().__init__()
 
@@ -47,8 +48,6 @@ class AIO_Block(nn.Module):
             raise ValueError('Please, SIGMOID, SOFTPLUS or EXP, as actnorm type')
 
         assert act_norm > 0., "please, this is not allowed. don't do it. take it... and go."
-        self.act_norm = nn.Parameter(torch.ones(1, self.in_channels, 1, 1) * float(act_norm))
-        self.act_offset = nn.Parameter(torch.zeros(1, self.in_channels, 1, 1))
         self.act_norm_trigger = True
 
         if permute_soft:
@@ -59,15 +58,28 @@ class AIO_Block(nn.Module):
                 w[i,j] = 1.
         w_inv = w.T
 
-        self.w = nn.Parameter(torch.FloatTensor(w).view(channels, channels, 1, 1),
-                              requires_grad=False)
-        self.w_inv = nn.Parameter(torch.FloatTensor(w.T).view(channels, channels, 1, 1),
-                              requires_grad=False)
-
         self.conditional = (len(dims_c) > 0)
         condition_length = sum([dims_c[i][0] for i in range(len(dims_c))])
-
-        self.s = subnet_constructor(num_layers, dims_in[0][1], self.split_len1 + condition_length, self.split_len2*2, conv_size=3, dropout=dropout)
+        if not conv_size is None:
+            #Convolutional Block
+            self.act_norm = nn.Parameter(torch.ones(1, self.in_channels, 1, 1) * float(act_norm))
+            self.act_offset = nn.Parameter(torch.zeros(1, self.in_channels, 1, 1))
+            self.s = subnet_constructor(num_layers, dims_in[0][1], self.split_len1 + condition_length, hidden_size, self.split_len2*2, conv_size=3, dropout=dropout)
+            self.w = nn.Parameter(torch.FloatTensor(w).view(channels, channels, 1, 1),
+                                  requires_grad=False)
+            self.w_inv = nn.Parameter(torch.FloatTensor(w.T).view(channels, channels, 1, 1),
+                                  requires_grad=False)
+            self.permConv = F.conv2d
+        else:
+            #FC block
+            self.act_norm = nn.Parameter(torch.ones(1, self.in_channels) * float(act_norm))
+            self.act_offset = nn.Parameter(torch.zeros(1, self.in_channels))
+            self.s = subnet_constructor(num_layers, self.split_len1 + condition_length, self.split_len2*2, internal_size=hidden_size, dropout=dropout)
+            self.w = nn.Parameter(torch.FloatTensor(w).view(channels, channels),
+                                  requires_grad=False)
+            self.w_inv = nn.Parameter(torch.FloatTensor(w.T).view(channels, channels),
+                                  requires_grad=False)
+            self.permConv = torch.matmul
         self.last_jac = None
 
     def log_e(self, s):
@@ -79,25 +91,28 @@ class AIO_Block(nn.Module):
     def permute(self, x, rev=False):
         scale = self.actnorm_activation( self.act_norm)
         if rev:
-            return (F.conv2d(x, self.w_inv) - self.act_offset) / scale
+            return (self.permConv(x, self.w_inv) - self.act_offset) / scale
         else:
-            return F.conv2d(x * scale + self.act_offset, self.w)
+            return self.permConv(x * scale + self.act_offset, self.w)
 
 
     def affine(self, x, a, rev=False):
         ch = x.shape[1]
         sub_jac = self.log_e(a[:,:ch])
+        if sub_jac.ndim == 4:
+            jac_sum = torch.sum(sub_jac, dim=(1, 2, 3))
+        else:
+            jac_sum = torch.sum(sub_jac, dim=(1))
         if not rev:
             return (x * torch.exp(sub_jac) + 0.1 * a[:,ch:],
-                    torch.sum(sub_jac, dim=(1)))
+                    jac_sum)
         else:
             return ((x - 0.1 * a[:,ch:]) * torch.exp(-sub_jac),
-                    -torch.sum(sub_jac, dim=(1)))
+                    -jac_sum)
 
     def forward(self, x, c=[], rev=False):
         if rev:
             x = [self.permute(x[0], rev=True)]
-
         x1, x2 = torch.split(x[0], self.splits, dim=1)
         if not rev:
             a1 = self.s(torch.cat([x1, *c], 1) if self.conditional else x1)
@@ -108,7 +123,10 @@ class AIO_Block(nn.Module):
 
         self.last_jac = j2
         x_out = torch.cat((x1, x2), 1)
-        n_pixels = x_out.shape[2] * x_out.shape[3]
+        if x_out.ndim == 4:
+            n_pixels = x_out.shape[2] * x_out.shape[3]
+        else:
+            n_pixels = 1
         self.last_jac += ((-1)**rev * n_pixels) * (torch.log(self.actnorm_activation(self.act_norm) + 1e-12).sum())
         if not rev:
             x_out = self.permute(x_out, rev=False)
