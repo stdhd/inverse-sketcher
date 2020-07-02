@@ -1,5 +1,5 @@
 batch_size: 16
-n_epochs: 5
+n_epochs: 100
 
 #Optimizer
 optimizer: Adam
@@ -12,10 +12,10 @@ model_params: {dim_cond: [1,256,256], conv_size_cond: 3,
                cond_dropout: 0.0,
                num_cond_layers: 3,
                dim_x: [3,256,256],
-               n_blocks: 2,
+               n_blocks: 20,
                clamping: 0.9,
                conv_size: 3,
-               layers_per_block: 3, #includes input and output layer, so 1 means no hidden layers
+               layers_per_block: 4, #includes input and output layer, so 1 means no hidden layers
                dropout: 0.0,
                permute_soft: False}
 
