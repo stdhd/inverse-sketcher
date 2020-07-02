@@ -15,7 +15,7 @@ def load_trained_model(file):
     """
 
     try:
-        state_dicts = torch.load(file)
+        state_dicts = torch.load(file, map_location=torch.device('cpu'))
     except:
         raise (RuntimeError("Could not load training result from file " + file + "."))
 
@@ -40,7 +40,7 @@ if __name__== "__main__":
         device = torch.device('cpu')
         print("CUDA disabled.")
 
-    evaluate_models = ["default_0623_50"]
+    evaluate_models = ["default_0629_15"]
 
     for model_name in evaluate_models:
 
@@ -57,7 +57,7 @@ if __name__== "__main__":
                 gauss_samples = torch.randn(batch_inputs.shape).to(device)
                 batch_output = model(gauss_samples, batch_conditions, rev = True)
 
-                if False:
+                if True:
                     fig, axes = plt.subplots(nrows=1, ncols=2)
                     im = transforms.ToPILImage()(batch_conditions[0]).convert('LA')
                     im2 = transforms.ToPILImage()(batch_output[0]).convert("RGB")
