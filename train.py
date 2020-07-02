@@ -56,16 +56,21 @@ def get_transform():
     return transforms.Resize((64, 64))
 
 
-def create_dataloaders(data_path, batch_size, test_ratio, split=None):
+def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None):
     """
     Create data loaders from ImageDataSet according parameters. If split is provided, it is used by the data loader.
     :param data_path: path of root directory of data set, while directories 'photo' and 'sketch' are sub directories
     :param batch_size:
     :param test_ratio: 0.1 means 10% test data
     :param split: optional train/test split
+    :param only_classes: optional list of folder names to retrieve training data from
     :return: train and test dataloaders and train and test split
     """
+<<<<<<< HEAD
     data_set = data.ImageDataSet(root_dir=data_path, transform=get_transform())
+=======
+    data_set = data.ImageDataSet(root_dir=data_path, only_classes=only_classes)
+>>>>>>> d079647030680e0c98cde2478ef207c7e20c7cf8
     if split is None:
         train_split, test_split = torch.utils.data.random_split(data_set, [math.ceil(len(data_set) * (1-test_ratio)),
                                                                            math.floor(len(data_set) * test_ratio)])
@@ -74,6 +79,8 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None):
 
     dataloader_train = DataLoader(train_split, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count(), drop_last=True)
     dataloader_test = DataLoader(test_split, batch_size=batch_size, shuffle=False, num_workers=os.cpu_count())
+
+
 
     return dataloader_train, dataloader_test, train_split, test_split
 
@@ -131,7 +138,9 @@ def save_state(param, model_state, optim_state, epoch, running_loss, split, over
         'test_split': split[1],
         'model_params': param['model_params'],
         'batch_size': param['batch_size'],
-        'test_ratio': param['test_ratio']
+        'test_ratio': param['test_ratio'],
+        'only_classes': param['only_classes']
+
     }, f"{path}.tar")
 
 
@@ -157,6 +166,8 @@ if __name__ == "__main__":
     pp = pprint.PrettyPrinter(indent=4)
     for param_name in list_hyper_params:
         params = parse_yaml(os.path.join("params", param_name))
+        if not 'only_classes' in params:
+            params['only_classes'] = None
 
         if params.get("load_model", False):
             # Load training progress from existing split
@@ -165,7 +176,8 @@ if __name__ == "__main__":
                                                                                             "/256x256",
                                                                                             params["batch_size"],
                                                                                             params["test_ratio"],
-                                                                                            split=split)
+                                                                                            split=split,
+                                                                                            only_classes=params['only_classes'])
         else:
             # Init new training with new split
             model = get_model(params)
@@ -174,7 +186,8 @@ if __name__ == "__main__":
             dataloader_train, dataloader_test, train_split, test_split = create_dataloaders("dataset/SketchyDatabase"
                                                                                             "/256x256",
                                                                                             params["batch_size"],
-                                                                                            params["test_ratio"])
+                                                                                            params["test_ratio"],
+                                                                                            only_classes=params['only_classes'])
             split = (train_split, test_split)
 
         t_start = time()
@@ -191,7 +204,7 @@ if __name__ == "__main__":
                 epoch_loss += loss.item()/len(dataloader_train)
                 optimizer.step()
                 optimizer.zero_grad()
-            print("Loss: {}".format(epoch_loss))
+            print("Epoch Loss: {}".format(epoch_loss))
             save_state(params, model.model.state_dict(), optimizer.state_dict(), epoch, loss, split)
 
         print('%.3i \t%.6f' % (epoch, (time() - t_start) / 60.))

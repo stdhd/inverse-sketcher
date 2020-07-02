@@ -29,17 +29,19 @@ class ImageMetaData(object):
 
 class ImageDataSet(Dataset):
 
-    def __init__(self, root_dir, transform=None, return_path=False):
+    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None):
         """
         root_dir: directory of the dataset
         include_unk: Whether to include the unknown class
         transform: transormations to be applied every time a batch is loaded
+        only_classes: List of folder names to take data from, exclusively
         """
         self.__sketch_dir = os.path.join(root_dir,  "sketch")
         self.__real_dir = os.path.join(root_dir,  "photo")
         self.__transform = transform
         self.__meta = list()
         self.return_path = return_path
+        self.only_classes = only_classes
 
         self.get_class_numbers()
         self.__process_meta()
@@ -56,7 +58,7 @@ class ImageDataSet(Dataset):
             #label = self.class_numbers.get(classname)
             #if label is None:
             #    logger.error("Warning: Undefined class name {} in data directory {}".format(classname, self.__root_dir))
-            if os.path.isdir(os.path.join(self.__sketch_dir, classname)):
+            if os.path.isdir(os.path.join(self.__sketch_dir, classname)) and (self.only_classes==None or classname in self.only_classes):
                 for filename in os.listdir(os.path.join(self.__sketch_dir, classname)):
                     if not filename.startswith("."):
                         path_sketch = os.path.join(self.__sketch_dir, classname, filename)

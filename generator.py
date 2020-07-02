@@ -17,7 +17,7 @@ def load_trained_model(file):
     """
 
     try:
-        state_dicts = torch.load(file)
+        state_dicts = torch.load(file, map_location=torch.device('cpu'))
     except:
         raise (RuntimeError("Could not load training result from file " + file + "."))
 
@@ -42,9 +42,11 @@ if __name__== "__main__":
         device = torch.device('cpu')
         print("CUDA disabled.")
 
-    evaluate_models = ["default_0702_0"]
+
+    evaluate_models = ["default_0702_4"]
 
     for model_name in evaluate_models:
+        print('Generate from model {}'.format(model_name))
 
         model, split, params = load_trained_model(os.path.join("saved_models", model_name, "default.tar"))
         __, dataloader_test, ___, test_split = train.create_dataloaders(
