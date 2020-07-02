@@ -13,9 +13,10 @@ from torch.utils.data import DataLoader
 import os
 import torchvision
 import yaml
-from model import cINN
+from architecture import get_model_by_name
 from datetime import date
 import pprint
+from torchvision import transforms
 
 def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     """
@@ -51,6 +52,9 @@ def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
 
     return param
 
+def get_transform():
+    return transforms.Resize((64, 64))
+
 
 def create_dataloaders(data_path, batch_size, test_ratio, split=None):
     """
@@ -61,7 +65,7 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None):
     :param split: optional train/test split
     :return: train and test dataloaders and train and test split
     """
-    data_set = data.ImageDataSet(root_dir=data_path)
+    data_set = data.ImageDataSet(root_dir=data_path, transform=get_transform())
     if split is None:
         train_split, test_split = torch.utils.data.random_split(data_set, [math.ceil(len(data_set) * (1-test_ratio)),
                                                                            math.floor(len(data_set) * test_ratio)])
@@ -80,7 +84,7 @@ def get_optimizer(param, trainables):
 
 
 def get_model(param):
-    return cINN(**param.get("model_params")).to(device)
+    return get_model_by_name("").to(device)#cINN(**param.get("model_params")).to(device)
 
 
 def load_state(param):
@@ -178,14 +182,16 @@ if __name__ == "__main__":
         pp.pprint(params)
         for e in range(params["n_epochs"]):
             epoch += 1
+            epoch_loss = 0
             for batch, (sketch, real, label) in enumerate(tqdm(dataloader_train)):
                 sketch, real, label = sketch.to(device), real.to(device), label.to(device)
                 gauss_output = model(real, sketch)
-                loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / (gauss_output.shape[1]*gauss_output.shape[2] * gauss_output.shape[3])
+                loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / gauss_output.shape[1]
                 loss.backward()
+                epoch_loss += loss.item()/len(dataloader_train)
                 optimizer.step()
                 optimizer.zero_grad()
-                print("Loss: {}".format(loss))
+            print("Loss: {}".format(epoch_loss))
             save_state(params, model.model.state_dict(), optimizer.state_dict(), epoch, loss, split)
 
         print('%.3i \t%.6f' % (epoch, (time() - t_start) / 60.))

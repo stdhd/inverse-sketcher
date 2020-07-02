@@ -75,10 +75,6 @@ class SubnetConstructorFC(nn.Module):
             x = l(x)
         return x
 
-def subnet_conv(c_in, c_out):
-    return nn.Sequential(nn.Conv2d(c_in, 256,   3, padding=1), nn.ReLU(),
-                         nn.Conv2d(256,  c_out, 3, padding=1))
-
 class SubnetConstructorConv(nn.Module):
 
     def __init__(self, num_layers, size_in, in_channels, out_channels, stride=1, conv_size=3, dropout=0.0):

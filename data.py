@@ -84,7 +84,7 @@ class ImageDataSet(Dataset):
         sketch = Image.open(path_sketch).convert("L")
         image = Image.open(path_real)
 
-        if self.__transform is not None:
+        if not self.__transform is None:
             sketch = self.__transform(sketch)
             image = self.__transform(image)
 
