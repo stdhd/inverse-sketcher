@@ -48,8 +48,10 @@ class ImageDataSet(Dataset):
 
     def get_class_numbers(self):
         dict = {}
-        for i, classname in enumerate(os.listdir(self.__sketch_dir)):
-            dict[classname] = i
+        with os.scandir(self.__sketch_dir) as folder_iterator:
+            for i, classfolder in enumerate(folder_iterator):
+                dict[classfolder.name] = i
+            folder_iterator.close()
         self.__class_dict = dict
 
     def __process_meta(self):
