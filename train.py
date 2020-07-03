@@ -200,7 +200,7 @@ if __name__ == "__main__":
                 epoch_loss += loss.item()/len(dataloader_train)
                 optimizer.step()
                 optimizer.zero_grad()
-            print("Epoch Loss: {}".format(epoch_loss))
+            print("Epoch {} / {} Loss: {}".format(e + 1, params["n_epochs"], epoch_loss))
             save_state(params, model.model.state_dict(), optimizer.state_dict(), epoch, loss, split)
 
-        print('%.3i \t%.6f' % (epoch, (time() - t_start) / 60.))
+        print('%.3i \t%.6f min' % (epoch, (time() - t_start) / 60.))
