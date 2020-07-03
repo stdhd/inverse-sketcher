@@ -10,7 +10,6 @@ from architecture import get_model_by_name
 import numpy as np
 import scipy.stats
 
-
 def load_trained_model(file):
     """
     Provide model and test split from given parameter dictionary in file
@@ -62,24 +61,38 @@ def generate_from_testset(device, model_list):
             split=split)
         model.to(device)
 
+        try:
+            os.makedirs(os.path.join("generator", model_name))
+        except:
+            print("generate folder exists, so plot is overwritten")
+
         with torch.set_grad_enabled(False):
-            sanity_data = np.array([])
             for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(dataloader_test):
                 gauss_samples = torch.randn(batch_inputs.shape[0],
                                             batch_inputs.shape[1] * batch_inputs.shape[2] * batch_inputs.shape[3]).to(
                     device)
                 batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
 
-                # Only plot for first batch
-                if True:
-                    f = plt.figure()
-                    fig, axes = plt.subplots(nrows=3, ncols=2)
-                    for i in range(3):
-                        condition_image = transforms.ToPILImage()(batch_conditions[i]).convert('L')
-                        generated_image = transforms.ToPILImage()(batch_output[i]).convert("RGB")
-                        axes[i, 0].imshow(condition_image)
-                        axes[i, 1].imshow(generated_image)
-                    f.savefig(os.path.join("generator", model_name, "default.pdf"))
+                subset = 0
+                fig, axes = plt.subplots(nrows=3, ncols=2)
+                for i in range(batch_inputs.shape[0]):
+                    condition_image = transforms.ToPILImage()(batch_conditions[i]).convert('L')
+                    generated_image = transforms.ToPILImage()(batch_output[i]).convert("RGB")
+                    axes[i%3, 0].imshow(condition_image)
+                    axes[i%3, 1].imshow(generated_image)
+
+                    axes[i%3, 0].axis('off')
+                    axes[i%3, 1].axis('off')
+
+                    if i > 0 and (i % 3 == 0 or i == batch_inputs.shape[0] - 1):
+                        plt.savefig(
+                            os.path.join("generator", model_name, "out_batch{}_{}.pdf".format(batch_no, subset)),
+                            bbox_inches='tight')
+                        subset += 1
+                        plt.close(fig)
+                        fig, axes = plt.subplots(nrows=3, ncols=2)
+                    if i == batch_inputs.shape[0]:
+                        plt.close(fig)
 
 
 def sanity_check(device, model_list):
@@ -121,7 +134,7 @@ if __name__== "__main__":
 
     model_list = ["default_0703_6"]
 
-    sanity_check(device, model_list)
-
+    #sanity_check(device, model_list)
+    generate_from_testset(device, model_list)
 
 
