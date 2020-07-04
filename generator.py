@@ -43,7 +43,7 @@ if __name__== "__main__":
         print("CUDA disabled.")
 
 
-    evaluate_models = ["default_0702_4"]
+    evaluate_models = ["default_0703_0"]
 
     for model_name in evaluate_models:
         print('Generate from model {}'.format(model_name))
