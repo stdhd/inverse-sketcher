@@ -77,9 +77,8 @@ class ImageDataSet(Dataset):
                                 #if not self.load_on_request:
                                 #    image = torch.from_numpy(cv2.imread(path))
                                 self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name]))
-                                self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name]))
-                                print(path_real)
                                 if self.only_one_sample:
+                                    self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name]))
                                     sketch_iterator.close()
                                     folder_iterator.close()
                                     print("ONLY-ONE-SAMPLE-MODE (+ one duplicate to create split): Processed {} sketches".format(len(self.__meta)))

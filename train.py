@@ -86,7 +86,16 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
 
 def get_optimizer(param, trainables):
     optimizer = getattr(torch.optim, param.get("optimizer"))(trainables, **param.get("optimizer_params"))
-    return optimizer
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        factor = 0.4,
+        patience=50,
+        cooldown=50,
+        threshold=5e-4,
+        threshold_mode='rel',
+        verbose=True
+    )
+    return scheduler, optimizer
 
 
 def get_model(param):
@@ -143,6 +152,16 @@ def save_state(param, model_state, optim_state, epoch, running_loss, split, over
 
     }, f"{path}.tar")
 
+def validate(model, dataloader_test):
+    with torch.no_grad():
+        val_loss = 0
+        for batch, (sketch, real, label) in enumerate(tqdm(dataloader_test)):
+            sketch, real, label = sketch.to(device), real.to(device), label.to(device)
+            gauss_output = model(real, sketch)
+            loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / gauss_output.shape[1]
+            val_loss += loss/len(dataloader_test)
+    return val_loss
+
 
 if __name__ == "__main__":
     # Determine, whether cuda will be enabled
@@ -186,7 +205,7 @@ if __name__ == "__main__":
         else:
             # Init new training with new split
             model = get_model(params)
-            optimizer = get_optimizer(params, model.parameters())
+            scheduler, optimizer = get_optimizer(params, model.parameters())
             epoch = 0
             dataloader_train, dataloader_test, train_split, test_split = create_dataloaders("dataset/SketchyDatabase"
                                                                                             "/256x256",
@@ -203,13 +222,14 @@ if __name__ == "__main__":
             epoch += 1
             epoch_loss = 0
             for batch, (sketch, real, label) in enumerate(tqdm(dataloader_train)):
+                optimizer.zero_grad()
                 sketch, real, label = sketch.to(device), real.to(device), label.to(device)
                 gauss_output = model(real, sketch)
                 loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / gauss_output.shape[1]
                 loss.backward()
                 epoch_loss += loss.item()/len(dataloader_train)
                 optimizer.step()
-                optimizer.zero_grad()
+            scheduler.step(validate(model, dataloader_test))
             print("Epoch {} / {} Loss: {}".format(e + 1, params["n_epochs"], epoch_loss))
             save_state(params, model.model.state_dict(), optimizer.state_dict(), epoch, loss, split)
 
