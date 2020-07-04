@@ -135,7 +135,7 @@ if __name__== "__main__":
         device = torch.device('cpu')
         print("CUDA disabled.")
 
-    model_list = ["default_0704_49"]
+    model_list = ["default_0704_50"]
 
     #sanity_check(device, model_list)
     generate_from_testset(device, model_list)
