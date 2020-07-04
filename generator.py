@@ -57,8 +57,9 @@ def generate_from_testset(device, model_list):
             "/256x256",
             params["batch_size"],
             params["test_ratio"],
-            only_classes=params["only_classes"],
-            split=split)
+            only_classes=train.value_or_none(params, "only_classes"),
+            split=split,
+            only_one_sample=train.value_or_none(params, "only_one_sample"))
         model.to(device)
 
         try:
@@ -105,8 +106,10 @@ def sanity_check(device, model_list):
             "/256x256",
             params["batch_size"],
             params["test_ratio"],
-            only_classes=params["only_classes"],
-            split=split)
+            only_classes=train.value_or_none(params, "only_classes"),
+            split=split,
+            only_one_sample=train.value_or_none(params, "only_one_sample")
+        )
         model.to(device)
 
         with torch.set_grad_enabled(False):
@@ -132,7 +135,7 @@ if __name__== "__main__":
         device = torch.device('cpu')
         print("CUDA disabled.")
 
-    model_list = ["default_0703_6"]
+    model_list = ["default_0704_8"]
 
     #sanity_check(device, model_list)
     generate_from_testset(device, model_list)
