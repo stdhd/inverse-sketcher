@@ -29,12 +29,14 @@ class ImageMetaData(object):
 
 class ImageDataSet(Dataset):
 
-    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None):
+    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.005):
         """
         root_dir: directory of the dataset
         include_unk: Whether to include the unknown class
         transform: transormations to be applied every time a batch is loaded
         only_classes: List of folder names to take data from, exclusively
+        only_one_sample: If this is true, train and test set only contain ONE same sample
+        noise_factor: Factor for the noise added to both sketch and image
         """
         self.__sketch_dir = os.path.join(root_dir,  "sketch")
         self.__real_dir = os.path.join(root_dir,  "photo")
@@ -42,34 +44,48 @@ class ImageDataSet(Dataset):
         self.__meta = list()
         self.return_path = return_path
         self.only_classes = only_classes
+        self.only_one_sample = only_one_sample
+        self.noise_factor = noise_factor
 
         self.get_class_numbers()
         self.__process_meta()
 
     def get_class_numbers(self):
         dict = {}
-        for i, classname in enumerate(os.listdir(self.__sketch_dir)):
-            dict[classname] = i
+        with os.scandir(self.__sketch_dir) as folder_iterator:
+            for i, classfolder in enumerate(folder_iterator):
+                dict[classfolder.name] = i
+            folder_iterator.close()
         self.__class_dict = dict
 
     def __process_meta(self):
         #class1, class2, ...
-        for classname in os.listdir(self.__sketch_dir):
-            #label = self.class_numbers.get(classname)
-            #if label is None:
-            #    logger.error("Warning: Undefined class name {} in data directory {}".format(classname, self.__root_dir))
-            if os.path.isdir(os.path.join(self.__sketch_dir, classname)) and (self.only_classes==None or classname in self.only_classes):
-                for filename in os.listdir(os.path.join(self.__sketch_dir, classname)):
-                    if not filename.startswith("."):
-                        path_sketch = os.path.join(self.__sketch_dir, classname, filename)
-                        path_real = os.path.join(self.__real_dir, classname, filename.split("-")[0] + ".jpg")
-                        if not os.path.exists(path_real):
-                            logger.error("Warning: Could not find real image named {} corresponding to sketch {}".format(path_real, path_sketch))
-                            continue
-                        #if not self.load_on_request:
-                        #    image = torch.from_numpy(cv2.imread(path))
-                        self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classname]))
-        print("Processed {} sketches".format(len(self.__meta)))
+        with os.scandir(self.__sketch_dir) as folder_iterator:
+            for classfolder in folder_iterator:
+                #label = self.class_numbers.get(classname)
+                #if label is None:
+                #    logger.error("Warning: Undefined class name {} in data directory {}".format(classname, self.__root_dir))
+                if os.path.isdir(os.path.join(self.__sketch_dir, classfolder.name)) and (self.only_classes==None or classfolder.name in self.only_classes):
+                    with os.scandir(os.path.join(self.__sketch_dir, classfolder.name)) as sketch_iterator:
+                        for file in sketch_iterator:
+                            if not file.name.startswith("."):
+                                path_sketch = os.path.join(self.__sketch_dir, classfolder.name, file.name)
+                                path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("-")[0] + ".jpg")
+                                if not os.path.exists(path_real):
+                                    logger.error("Warning: Could not find real image named {} corresponding to sketch {}".format(path_real, path_sketch))
+                                    continue
+                                #if not self.load_on_request:
+                                #    image = torch.from_numpy(cv2.imread(path))
+                                self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name]))
+                                self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name]))
+                                if self.only_one_sample:
+                                    sketch_iterator.close()
+                                    folder_iterator.close()
+                                    print("ONLY-ONE-SAMPLE-MODE (+ one duplicate to create split): Processed {} sketches".format(len(self.__meta)))
+                                    return
+                        sketch_iterator.close()
+            print("Processed {} sketches".format(len(self.__meta)))
+            folder_iterator.close()
 
 
     def __len__(self):
@@ -83,6 +99,10 @@ class ImageDataSet(Dataset):
         path_sketch = meta.get_sketch()
         path_real = meta.get_real()
 
+        # Please leave this here, as the dataset in my colab has some duplicates:
+        if path_sketch.endswith(' (1).png'):
+            path_sketch = path_sketch.split(" ")[0] + ".png"
+
         sketch = Image.open(path_sketch).convert("L")
         image = Image.open(path_real)
 
@@ -93,6 +113,13 @@ class ImageDataSet(Dataset):
         tensor_transform = torchvision.transforms.ToTensor()
         image = tensor_transform(image)
         sketch = tensor_transform(sketch)
+
         #Make the background pixels black and brushstroke pixels white
         sketch = (1 - sketch)
+
+        # Add noise
+        image += self.noise_factor * torch.rand_like(image)
+        sketch += self.noise_factor * torch.rand_like(sketch)
+
+
         return sketch, image, meta.get_class()
