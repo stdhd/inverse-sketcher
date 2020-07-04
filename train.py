@@ -138,17 +138,11 @@ def save_state(param, model_state, optim_state, epoch, running_loss, split, over
         'model_params': param['model_params'],
         'batch_size': param['batch_size'],
         'test_ratio': param['test_ratio'],
-        'only_classes': value_or_none(param, 'only_classes'),
-        'only_one_sample': value_or_none(param, 'only_one_sample')
+        'only_classes': param.get('only_classes', None),
+        'only_one_sample': param.get('only_one_sample', False)
 
     }, f"{path}.tar")
 
-
-def value_or_none(dict, parameter):
-    if parameter in dict:
-        return dict[parameter]
-    else:
-        return None
 
 if __name__ == "__main__":
     # Determine, whether cuda will be enabled

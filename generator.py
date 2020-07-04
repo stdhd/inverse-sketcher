@@ -57,9 +57,9 @@ def generate_from_testset(device, model_list):
             "/256x256",
             params["batch_size"],
             params["test_ratio"],
-            only_classes=train.value_or_none(params, "only_classes"),
+            only_classes=params.get("only_classes", None),
             split=split,
-            only_one_sample=train.value_or_none(params, "only_one_sample"))
+            only_one_sample=params.get("only_one_sample", False))
         model.to(device)
 
         try:
@@ -85,7 +85,7 @@ def generate_from_testset(device, model_list):
                     axes[i%3, 0].axis('off')
                     axes[i%3, 1].axis('off')
 
-                    if i > 0 and (i % 3 == 0 or i == batch_inputs.shape[0] - 1):
+                    if i % 3 == 0 or i == batch_inputs.shape[0] - 1:
                         plt.savefig(
                             os.path.join("generator", model_name, "out_batch{}_{}.pdf".format(batch_no, subset)),
                             bbox_inches='tight')
@@ -106,9 +106,9 @@ def sanity_check(device, model_list):
             "/256x256",
             params["batch_size"],
             params["test_ratio"],
-            only_classes=train.value_or_none(params, "only_classes"),
+            only_classes=params.get("only_classes", None),
             split=split,
-            only_one_sample=train.value_or_none(params, "only_one_sample")
+            only_one_sample=params.get("only_one_sample", False)
         )
         model.to(device)
 
@@ -135,7 +135,7 @@ if __name__== "__main__":
         device = torch.device('cpu')
         print("CUDA disabled.")
 
-    model_list = ["default_0704_8"]
+    model_list = ["default_0704_33"]
 
     #sanity_check(device, model_list)
     generate_from_testset(device, model_list)
