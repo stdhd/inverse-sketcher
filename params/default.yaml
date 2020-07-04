@@ -1,9 +1,9 @@
 batch_size: 16
-n_epochs: 100
+n_epochs: 300
 
 #Optimizer
 optimizer: Adam
-optimizer_params: {lr: 0.001, weight_decay: 0.00001}
+optimizer_params: {lr: 0.0005, weight_decay: 0.00001}
 test_ratio: 0.1
 
 #Model
