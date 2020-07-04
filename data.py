@@ -48,28 +48,34 @@ class ImageDataSet(Dataset):
 
     def get_class_numbers(self):
         dict = {}
-        for i, classname in enumerate(os.listdir(self.__sketch_dir)):
-            dict[classname] = i
+        with os.scandir(self.__sketch_dir) as folder_iterator:
+            for i, classfolder in enumerate(folder_iterator):
+                dict[classfolder.name] = i
+            folder_iterator.close()
         self.__class_dict = dict
 
     def __process_meta(self):
         #class1, class2, ...
-        for classname in os.listdir(self.__sketch_dir):
-            #label = self.class_numbers.get(classname)
-            #if label is None:
-            #    logger.error("Warning: Undefined class name {} in data directory {}".format(classname, self.__root_dir))
-            if os.path.isdir(os.path.join(self.__sketch_dir, classname)) and (self.only_classes==None or classname in self.only_classes):
-                for filename in os.listdir(os.path.join(self.__sketch_dir, classname)):
-                    if not filename.startswith("."):
-                        path_sketch = os.path.join(self.__sketch_dir, classname, filename)
-                        path_real = os.path.join(self.__real_dir, classname, filename.split("-")[0] + ".jpg")
-                        if not os.path.exists(path_real):
-                            logger.error("Warning: Could not find real image named {} corresponding to sketch {}".format(path_real, path_sketch))
-                            continue
-                        #if not self.load_on_request:
-                        #    image = torch.from_numpy(cv2.imread(path))
-                        self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classname]))
-        print("Processed {} sketches".format(len(self.__meta)))
+        with os.scandir(self.__sketch_dir) as folder_iterator:
+            for classfolder in folder_iterator:
+                #label = self.class_numbers.get(classname)
+                #if label is None:
+                #    logger.error("Warning: Undefined class name {} in data directory {}".format(classname, self.__root_dir))
+                if os.path.isdir(os.path.join(self.__sketch_dir, classfolder.name)) and (self.only_classes==None or classfolder.name in self.only_classes):
+                    with os.scandir(os.path.join(self.__sketch_dir, classfolder.name)) as sketch_iterator:
+                        for file in sketch_iterator:
+                            if not file.name.startswith("."):
+                                path_sketch = os.path.join(self.__sketch_dir, classfolder.name, file.name)
+                                path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("-")[0] + ".jpg")
+                                if not os.path.exists(path_real):
+                                    logger.error("Warning: Could not find real image named {} corresponding to sketch {}".format(path_real, path_sketch))
+                                    continue
+                                #if not self.load_on_request:
+                                #    image = torch.from_numpy(cv2.imread(path))
+                                self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name]))
+                        sketch_iterator.close()
+            print("Processed {} sketches".format(len(self.__meta)))
+            folder_iterator.close()
 
 
     def __len__(self):
