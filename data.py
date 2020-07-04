@@ -78,6 +78,7 @@ class ImageDataSet(Dataset):
                                 #    image = torch.from_numpy(cv2.imread(path))
                                 self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name]))
                                 self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name]))
+                                print(path_real)
                                 if self.only_one_sample:
                                     sketch_iterator.close()
                                     folder_iterator.close()
@@ -120,6 +121,9 @@ class ImageDataSet(Dataset):
         # Add noise
         image += self.noise_factor * torch.rand_like(image)
         sketch += self.noise_factor * torch.rand_like(sketch)
+
+        #trans = torchvision.transforms.ToPILImage()
+        #trans(image).show()
 
 
         return sketch, image, meta.get_class()
