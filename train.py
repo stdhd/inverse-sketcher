@@ -86,14 +86,9 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
 
 def get_optimizer(param, trainables):
     optimizer = getattr(torch.optim, param.get("optimizer"))(trainables, **param.get("optimizer_params"))
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(
         optimizer,
-        factor = 0.4,
-        patience=50,
-        cooldown=50,
-        threshold=5e-4,
-        threshold_mode='rel',
-        verbose=True
+        gamma=0.98
     )
     return scheduler, optimizer
 
