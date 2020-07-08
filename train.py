@@ -32,9 +32,9 @@ def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     except:
         raise (RuntimeError("Could not load model parameters from " + file_path + "."))
 
-    if param.get("load_model", False):
-        param["save_dir"] = os.path.join("saved_models", param["load_model"])
-    elif create_folder:
+    #if param.get("load_model", False):
+        #param["save_dir"] = os.path.join("saved_models", param["load_model"])
+    if create_folder:
         # Find save directory
         if not os.path.exists("saved_models"):
             os.mkdir("saved_models")
@@ -104,9 +104,10 @@ def load_state(param):
     :return: model, optimizer, epoch, data split
     """
     model = get_model(param)
-    optimizer = get_optimizer(param, model.parameters())
+    scheduler, optimizer = get_optimizer(param, model.parameters())
     try:
-        state_dicts = torch.load(param.get("save_dir")+f"/{param.get('model_name')}.tar", map_location=device)
+        print(param.get("load_model")+f"/{param.get('model_name')}.tar")
+        state_dicts = torch.load("saved_models/" + param.get("load_model")+f"/{param.get('model_name')}.tar", map_location=device)
     except:
         raise (RuntimeError("Could not load training state parameters for " + param.get('model_name') + "."))
     model.model.load_state_dict(state_dicts["model_state_dict"])
@@ -118,7 +119,7 @@ def load_state(param):
     if not opt_param.get("lr") is None and not opt_param.get("lr") == optimizer.param_groups[0]["lr"]:
         optimizer.param_groups[0]["lr"] = opt_param["lr"]
     split = (state_dicts["train_split"], state_dicts["test_split"])
-    return model, optimizer, epoch, split
+    return model, optimizer, epoch, split, scheduler
 
 
 def save_state(param, model_state, optim_state, epoch, running_loss, split, overwrite_chkpt=True):
@@ -174,7 +175,7 @@ if __name__ == "__main__":
         print("CUDA disabled.")
 
     # Define dictionary of hyper parameters
-    list_hyper_params = ["default.yaml"]
+    list_hyper_params = ["default_lr.yaml"]
 
     # Loop over hyper parameter configurations
     pp = pprint.PrettyPrinter(indent=4)
@@ -189,7 +190,7 @@ if __name__ == "__main__":
 
         if params.get("load_model", False):
             # Load training progress from existing split
-            model, optimizer, epoch, split = load_state(params)
+            model, optimizer, epoch, split, scheduler = load_state(params)
             dataloader_train, dataloader_test, train_split, test_split = create_dataloaders("dataset/SketchyDatabase"
                                                                                             "/256x256",
                                                                                             params["batch_size"],
