@@ -119,10 +119,14 @@ def load_state(param):
     if not opt_param.get("lr") is None and not opt_param.get("lr") == optimizer.param_groups[0]["lr"]:
         optimizer.param_groups[0]["lr"] = opt_param["lr"]
     split = (state_dicts["train_split"], state_dicts["test_split"])
+    try:
+        scheduler.load_state_dict(state_dicts["scheduler_state_dict"])
+    except:
+        print("Warning, could not load scheduler state dict, continuing with default values")
     return model, optimizer, epoch, split, scheduler
 
 
-def save_state(param, model_state, optim_state, epoch, running_loss, split, overwrite_chkpt=True):
+def save_state(param, model_state, optim_state, scheduler_state, epoch, running_loss, split, overwrite_chkpt=True):
     """
     Save state of training into yaml file in folder saved_models
     :param param: dictionary of used parameters
@@ -144,7 +148,8 @@ def save_state(param, model_state, optim_state, epoch, running_loss, split, over
         'batch_size': param['batch_size'],
         'test_ratio': param['test_ratio'],
         'only_classes': param.get('only_classes', None),
-        'only_one_sample': param.get('only_one_sample', False)
+        'only_one_sample': param.get('only_one_sample', False),
+        'scheduler_state_dict': scheduler_state
 
     }, f"{path}.tar")
 
@@ -175,7 +180,7 @@ if __name__ == "__main__":
         print("CUDA disabled.")
 
     # Define dictionary of hyper parameters
-    list_hyper_params = ["default_lr.yaml"]
+    list_hyper_params = ["default.yaml"]
 
     # Loop over hyper parameter configurations
     pp = pprint.PrettyPrinter(indent=4)
