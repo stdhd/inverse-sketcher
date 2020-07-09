@@ -74,13 +74,14 @@ def generate_from_testset(device, model_list):
                                             batch_inputs.shape[1] * batch_inputs.shape[2] * batch_inputs.shape[3]).to(
                     device)
                 batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
-
                 subset = 0
                 fig, axes = plt.subplots(nrows=3, ncols=2)
                 for i in range(batch_inputs.shape[0]):
+
                     condition_image = transforms.ToPILImage()(batch_conditions[i].cpu().detach()).convert('L')
                     generated_image = transforms.ToPILImage()(batch_output[i].cpu().detach()).convert("RGB")
-                    axes[i%3, 0].imshow(condition_image)
+                    axes[i%3, 0].imshow(condition_image, cmap='gray')
+
                     axes[i%3, 1].imshow(generated_image)
 
                     axes[i%3, 0].axis('off')
@@ -125,6 +126,21 @@ def sanity_check(device, model_list):
             # Plot sanity check data
             latent_gauss(model_name, sanity_data, "")
 
+def load_checkpoint(filepath):
+    checkpoint = torch.load(filepath)
+    model = checkpoint['model']
+    model.load_state_dict(checkpoint['state_dict'])
+    for parameter in model.parameters():
+        parameter.requires_grad = False
+
+    model.eval()
+    return model
+
+def save__architecture_and_parameters(model):
+    checkpoint = {'model': get_model_by_name(""),
+                  'state_dict': model.state_dict()}
+    torch.save(checkpoint, 'checkpoint.pth')
+
 
 if __name__== "__main__":
     parser = argparse.ArgumentParser(description='PyTorch')
@@ -139,7 +155,9 @@ if __name__== "__main__":
         device = torch.device('cpu')
         print("CUDA disabled.")
 
-    model_list = ["default_0707_0"]
+    model_list = ["default_0705_101"]
 
-    sanity_check(device, model_list)
-    generate_from_testset(device, model_list)
+    #sanity_check(device, model_list)
+   # generate_from_testset(device, model_list)
+
+

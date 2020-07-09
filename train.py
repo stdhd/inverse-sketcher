@@ -17,6 +17,7 @@ from architecture import get_model_by_name
 from datetime import date
 import pprint
 from torchvision import transforms
+from PIL import ImageFile
 
 def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     """
@@ -66,7 +67,6 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
     :param only_classes: optional list of folder names to retrieve training data from
     :return: train and test dataloaders and train and test split
     """
-    print(only_one_sample)
     if only_one_sample:
         test_ratio = 0.5
         batch_size = 1
@@ -133,6 +133,7 @@ def save_state(param, model_state, optim_state, scheduler_state, epoch, running_
     :param overwrite_chkpt: If true, save to file without _epoch extension. Otherwise save to file with _epoch extension.
     :return:
     """
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
     if not overwrite_chkpt:
         path = os.path.join(param["save_dir"], param["model_name"] + "_" + str(epoch))
     else:
@@ -170,6 +171,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch')
     parser.add_argument('--nocuda', action='store_true',
                         help='Disable CUDA')
+    parser.add_argument('--nocheckpoints', action='store_true',
+                        help='Disable storing training state checkpoints. Model will be saved at the end of training.')
     args = parser.parse_args()
     device = None
     if not args.nocuda and torch.cuda.is_available():
@@ -186,10 +189,10 @@ if __name__ == "__main__":
     pp = pprint.PrettyPrinter(indent=4)
     for param_name in list_hyper_params:
         params = parse_yaml(os.path.join("params", param_name))
-        if not 'only_classes' in params:
-            params['only_classes'] = None
         if not 'only_one_sample' in params:
             params['only_one_sample'] = False
+        if args.nocheckpoints:
+            print("No checkpoint mode active. No checkpoint is created after every batch. Model will be saved to {} at the end of trainig.".format(params["save_dir"]))
         if params['only_one_sample']:
             print("!!!!!!!!!!!!!!!! ONLY ONE SAMPLE MODE IS ACITVE !!!!!!!!!!!!!!!!")
 
@@ -201,8 +204,8 @@ if __name__ == "__main__":
                                                                                             params["batch_size"],
                                                                                             params["test_ratio"],
                                                                                             split=split,
-                                                                                            only_classes=params['only_classes'],
-                                                                                            only_one_sample=params['only_one_sample'])
+                                                                                            only_classes=params.get('only_classes', None),
+                                                                                            only_one_sample=params.get('only_one_sample', False))
         else:
             # Init new training with new split
             model = get_model(params)
@@ -212,8 +215,8 @@ if __name__ == "__main__":
                                                                                             "/256x256",
                                                                                             params["batch_size"],
                                                                                             params["test_ratio"],
-                                                                                            only_classes=params['only_classes'],
-                                                                                            only_one_sample=params['only_one_sample'])
+                                                                                            only_classes=params.get('only_classes', None),
+                                                                                            only_one_sample=params.get('only_one_sample', False))
             split = (train_split, test_split)
 
         t_start = time()
@@ -233,6 +236,12 @@ if __name__ == "__main__":
             scheduler.step()
             #scheduler.step(validate(model, dataloader_test))
             print("Epoch {} / {} Loss: {}".format(e + 1, params["n_epochs"], epoch_loss))
-            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
+
+            if not args.nocheckpoints:
+                save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
+        if args.nocheckpoints:
+            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss,
+                       split)
+            print("Model is saved to {}".format(params["save_dir"]))
 
         print('%.3i \t%.6f min' % (epoch, (time() - t_start) / 60.))
