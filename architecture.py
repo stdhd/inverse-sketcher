@@ -9,6 +9,12 @@ import FrEIA.modules as Fm
 def get_model_by_name(name):
     return baseline()
 
+def random_orthog(n):
+    w = torch.randn(n, n)
+    w = w + w.T
+    w, S, V = torch.svd(w)
+    return w
+
 
 def sub_conv(ch_hidden, kernel, num_hidden_layers=0):
     pad = kernel // 2
@@ -41,24 +47,29 @@ def baseline():
 
     split_nodes = []
 
-    for k in range(2):
+    for k in range(4):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
-                             {'subnet_constructor': sub_conv(32, 3, 5),
+                             {'subnet_constructor': sub_conv(64, 3, 0),
                               'clamp': 1.0},
                              conditions=conditions[0],
                              name=F'block_{k}'))
+        nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(3)}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+
 
     nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
 
-    for k in range(4):
+    for k in range(6):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {
-                                 'subnet_constructor': sub_conv(64, 3, 5),
+                                 'subnet_constructor': sub_conv(128, 3, 0),
                                  'clamp': 1.0,
                              },
                              conditions=conditions[1],
                              name=F'block_{k + 2}'))
-        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(12)}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+
 
     # split off 8/12 ch
     nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
@@ -67,15 +78,17 @@ def baseline():
 
     nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
 
-    for k in range(4):
+    for k in range(6):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {
-                                 'subnet_constructor': sub_conv(128, 3 if k%2 else 1, 5),
+                                 'subnet_constructor': sub_conv(256, 3 if k%2 else 1, 0),
                                  'clamp': 1.0,
                              },
                              conditions=conditions[2],
                              name=F'block_{k + 6}'))
-        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+
 
     # split off 8/16 ch
     nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
@@ -88,11 +101,13 @@ def baseline():
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {
                                  'clamp': 0.6,
-                                 'subnet_constructor': sub_fc(512, 5)
+                                 'subnet_constructor': sub_fc(512, 1)
                              },
                              conditions=conditions[3],
                              name=F'block_{k + 10}'))
+
         nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
     # concat everything
     nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
                          Fm.Concat1d, {'dim': 0}))
@@ -222,3 +237,32 @@ class SubnetConstructorConv(nn.Module):
         for l in self.layers:
             x = l(x)
         return x
+
+
+class LearnedActNorm(nn.Module):
+    '''Learned transformation according to y = Mx + b, with invertible
+    matrix M.'''
+
+    def __init__(self, dims_in, M, b):
+        super().__init__()
+
+        self.M = nn.Parameter(M, requires_grad=True)
+        self.b = nn.Parameter(b, requires_grad=True)
+        self.activation = nn.Softplus(beta=0.5)
+
+
+
+    def forward(self, x, rev=False):
+        if not rev:
+            return [self.activation(self.M) * x[0] + self.b]
+        else:
+            return [(x[0] - self.b)/ self.activation(self.M) ]
+
+    def jacobian(self, x, rev=False):
+        if rev:
+            return - torch.log(self.activation(self.M))
+        else:
+            return torch.log(self.activation(self.M))
+
+    def output_dims(self, input_dims):
+        return input_dims

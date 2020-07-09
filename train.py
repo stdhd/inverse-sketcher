@@ -33,9 +33,9 @@ def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     except:
         raise (RuntimeError("Could not load model parameters from " + file_path + "."))
 
-    if param.get("load_model", False):
-        param["save_dir"] = os.path.join("saved_models", param["load_model"])
-    elif create_folder:
+    #if param.get("load_model", False):
+        #param["save_dir"] = os.path.join("saved_models", param["load_model"])
+    if create_folder:
         # Find save directory
         if not os.path.exists("saved_models"):
             os.mkdir("saved_models")
@@ -86,14 +86,9 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
 
 def get_optimizer(param, trainables):
     optimizer = getattr(torch.optim, param.get("optimizer"))(trainables, **param.get("optimizer_params"))
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(
         optimizer,
-        factor = 0.4,
-        patience=50,
-        cooldown=50,
-        threshold=5e-4,
-        threshold_mode='rel',
-        verbose=True
+        gamma=0.98
     )
     return scheduler, optimizer
 
@@ -109,9 +104,10 @@ def load_state(param):
     :return: model, optimizer, epoch, data split
     """
     model = get_model(param)
-    optimizer = get_optimizer(param, model.parameters())
+    scheduler, optimizer = get_optimizer(param, model.parameters())
     try:
-        state_dicts = torch.load(param.get("save_dir")+f"/{param.get('model_name')}.tar", map_location=device)
+        print(param.get("load_model")+f"/{param.get('model_name')}.tar")
+        state_dicts = torch.load("saved_models/" + param.get("load_model")+f"/{param.get('model_name')}.tar", map_location=device)
     except:
         raise (RuntimeError("Could not load training state parameters for " + param.get('model_name') + "."))
     model.model.load_state_dict(state_dicts["model_state_dict"])
@@ -123,10 +119,14 @@ def load_state(param):
     if not opt_param.get("lr") is None and not opt_param.get("lr") == optimizer.param_groups[0]["lr"]:
         optimizer.param_groups[0]["lr"] = opt_param["lr"]
     split = (state_dicts["train_split"], state_dicts["test_split"])
-    return model, optimizer, epoch, split
+    try:
+        scheduler.load_state_dict(state_dicts["scheduler_state_dict"])
+    except:
+        print("Warning, could not load scheduler state dict, continuing with default values")
+    return model, optimizer, epoch, split, scheduler
 
 
-def save_state(param, model_state, optim_state, epoch, running_loss, split, overwrite_chkpt=True):
+def save_state(param, model_state, optim_state, scheduler_state, epoch, running_loss, split, overwrite_chkpt=True):
     """
     Save state of training into yaml file in folder saved_models
     :param param: dictionary of used parameters
@@ -149,7 +149,8 @@ def save_state(param, model_state, optim_state, epoch, running_loss, split, over
         'batch_size': param['batch_size'],
         'test_ratio': param['test_ratio'],
         'only_classes': param.get('only_classes', None),
-        'only_one_sample': param.get('only_one_sample', False)
+        'only_one_sample': param.get('only_one_sample', False),
+        'scheduler_state_dict': scheduler_state
 
     }, f"{path}.tar")
 
@@ -197,7 +198,7 @@ if __name__ == "__main__":
 
         if params.get("load_model", False):
             # Load training progress from existing split
-            model, optimizer, epoch, split = load_state(params)
+            model, optimizer, epoch, split, scheduler = load_state(params)
             dataloader_train, dataloader_test, train_split, test_split = create_dataloaders("dataset/SketchyDatabase"
                                                                                             "/256x256",
                                                                                             params["batch_size"],
@@ -234,11 +235,12 @@ if __name__ == "__main__":
                 optimizer.step()
             scheduler.step(validate(model, dataloader_test))
             print("Epoch {} / {} Loss: {}".format(e + 1, params["n_epochs"], epoch_loss))
-            if not args.nocheckpoints:
-                save_state(params, model.model.state_dict(), optimizer.state_dict(), epoch, loss, split)
 
+            if not args.nocheckpoints:
+                save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
         if args.nocheckpoints:
-            save_state(params, model.model.state_dict(), optimizer.state_dict(), epoch, loss, split)
+            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss,
+                       split)
             print("Model is saved to {}".format(params["save_dir"]))
 
         print('%.3i \t%.6f min' % (epoch, (time() - t_start) / 60.))

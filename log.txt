@@ -1,0 +1,107 @@
+CUDA enabled.
+Reading paramfile params/default.yaml
+False
+Processed 75481 sketches
+Starting training for params:
+{   'batch_size': 16,
+    'load_model': False,
+    'model_name': 'default',
+    'model_params': {   'clamping': 0.9,
+                        'cond_dropout': 0.0,
+                        'conv_size': 3,
+                        'conv_size_cond': 3,
+                        'dim_cond': [1, 256, 256],
+                        'dim_cond_out': [3, 256, 256],
+                        'dim_x': [3, 256, 256],
+                        'dropout': 0.0,
+                        'layers_per_block': 4,
+                        'n_blocks': 20,
+                        'num_cond_layers': 3,
+                        'permute_soft': False},
+    'n_epochs': 400,
+    'only_classes': None,
+    'only_one_sample': False,
+    'optimizer': 'Adam',
+    'optimizer_params': {'lr': 0.0002, 'weight_decay': 1e-05},
+    'save_dir': 'saved_models/default_0705_0',
+    'test_ratio': 0.1}
+Epoch 1 / 400 Loss: -3.0541404945865858
+Epoch 2 / 400 Loss: -3.5155515150130867
+Epoch 3 / 400 Loss: -3.640466925449175
+Epoch 4 / 400 Loss: -3.717597493181796
+Epoch 5 / 400 Loss: -3.7666796034441044
+Epoch 6 / 400 Loss: -3.8080882724519354
+Epoch 7 / 400 Loss: -3.8353605036741163
+Epoch 8 / 400 Loss: -3.858377440208816
+Epoch 9 / 400 Loss: -3.881778795783739
+Epoch 10 / 400 Loss: -3.89843856808154
+Epoch 11 / 400 Loss: -3.9102316281259215
+Epoch 12 / 400 Loss: -3.925234104410345
+Epoch 13 / 400 Loss: -3.9361399395024947
+Epoch 14 / 400 Loss: -3.9448565959368778
+Epoch 15 / 400 Loss: -3.953176693865774
+Epoch 16 / 400 Loss: -3.9577979437734796
+Epoch 17 / 400 Loss: -3.9679623045544994
+Epoch 18 / 400 Loss: -3.9735599231944674
+Epoch 19 / 400 Loss: -3.9786971526937873
+Epoch 20 / 400 Loss: -3.9842529282272285
+Epoch 21 / 400 Loss: -3.9883391840859543
+Epoch 22 / 400 Loss: -3.9937017098192062
+Epoch 23 / 400 Loss: -3.9965425205455456
+Epoch 24 / 400 Loss: -3.9990439192566303
+Epoch 25 / 400 Loss: -4.004219225073592
+Epoch 26 / 400 Loss: -3.9955720422967116
+Epoch 27 / 400 Loss: -4.007732225896612
+Epoch 28 / 400 Loss: -4.012870744653536
+Epoch 29 / 400 Loss: -4.015010726915224
+Epoch 30 / 400 Loss: -4.017127719897119
+Epoch 31 / 400 Loss: -4.018270822801361
+Epoch 32 / 400 Loss: -4.021264488705475
+Epoch 33 / 400 Loss: -4.023428002347385
+Epoch 34 / 400 Loss: -4.026257638178656
+Epoch 35 / 400 Loss: -4.0267949195295625
+Epoch 36 / 400 Loss: -4.027587681299662
+Epoch 37 / 400 Loss: -4.029390042971103
+Epoch 38 / 400 Loss: -4.02867463648811
+Epoch 39 / 400 Loss: -4.033598928035928
+Epoch 40 / 400 Loss: -4.0356724347607535
+Epoch 41 / 400 Loss: -4.0373225091343246
+Epoch 42 / 400 Loss: -4.038165353408835
+Epoch 43 / 400 Loss: -4.038556344770294
+Epoch 44 / 400 Loss: -4.039167641357767
+Epoch 45 / 400 Loss: -4.041660807017592
+Epoch 46 / 400 Loss: -4.035284704313958
+Epoch 47 / 400 Loss: -4.044102223489536
+Epoch 48 / 400 Loss: -4.045192982703972
+Epoch 49 / 400 Loss: -4.0462758677587125
+Epoch 50 / 400 Loss: -4.0466618878821725
+Epoch 51 / 400 Loss: -4.04791238636516
+Epoch 52 / 400 Loss: -4.048840237787118
+Epoch 53 / 400 Loss: -4.044237757234611
+Epoch 54 / 400 Loss: -4.050745287323441
+Epoch 55 / 400 Loss: -4.051297183143519
+Epoch 56 / 400 Loss: -4.052665410586591
+Epoch 57 / 400 Loss: -4.052978392062956
+Epoch 58 / 400 Loss: -4.05374358304117
+Epoch 59 / 400 Loss: -4.054174365986084
+Epoch 60 / 400 Loss: -4.055421419783944
+Epoch 61 / 400 Loss: -4.0558491646752035
+Epoch 62 / 400 Loss: -4.0562188210279535
+Epoch 63 / 400 Loss: -4.057296585334624
+Epoch 64 / 400 Loss: -4.057515278862285
+Epoch 65 / 400 Loss: -4.058062430686187
+Epoch 66 / 400 Loss: -4.058088104239058
+Epoch 67 / 400 Loss: -4.060459242159113
+Epoch 68 / 400 Loss: -4.057677737057421
+Epoch 69 / 400 Loss: -4.061318430434405
+Epoch 70 / 400 Loss: -4.061284797744839
+Epoch 71 / 400 Loss: -4.0623913373486635
+Epoch 72 / 400 Loss: -4.06082610651517
+Epoch 73 / 400 Loss: -4.06184947465418
+Epoch 74 / 400 Loss: -4.063721222310237
+Epoch 75 / 400 Loss: -4.0636329445878205
+Epoch 76 / 400 Loss: -4.064554757588877
+Epoch 77 / 400 Loss: -4.064971007278581
+Epoch 78 / 400 Loss: -4.065389841436915
+Epoch 79 / 400 Loss: -4.0657614747261945
+Epoch 80 / 400 Loss: -4.065879728319513

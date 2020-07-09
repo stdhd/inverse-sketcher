@@ -69,6 +69,7 @@ def generate_from_testset(device, model_list):
 
         with torch.set_grad_enabled(False):
             for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(dataloader_test):
+                batch_conditions = batch_conditions.to(device)
                 gauss_samples = torch.randn(batch_inputs.shape[0],
                                             batch_inputs.shape[1] * batch_inputs.shape[2] * batch_inputs.shape[3]).to(
                     device)
@@ -76,9 +77,11 @@ def generate_from_testset(device, model_list):
                 subset = 0
                 fig, axes = plt.subplots(nrows=3, ncols=2)
                 for i in range(batch_inputs.shape[0]):
-                    condition_image = transforms.ToPILImage()(batch_conditions[i]).convert('L')
-                    generated_image = transforms.ToPILImage()(batch_output[i]).convert("RGB")
+
+                    condition_image = transforms.ToPILImage()(batch_conditions[i].cpu().detach()).convert('L')
+                    generated_image = transforms.ToPILImage()(batch_output[i].cpu().detach()).convert("RGB")
                     axes[i%3, 0].imshow(condition_image, cmap='gray')
+
                     axes[i%3, 1].imshow(generated_image)
 
                     axes[i%3, 0].axis('off')
@@ -93,6 +96,8 @@ def generate_from_testset(device, model_list):
                         fig, axes = plt.subplots(nrows=3, ncols=2)
                     if i == batch_inputs.shape[0]:
                         plt.close(fig)
+                if batch_no > 10:
+                    break
 
 
 def sanity_check(device, model_list):
@@ -114,9 +119,10 @@ def sanity_check(device, model_list):
         with torch.set_grad_enabled(False):
             sanity_data = np.array([])
             for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(dataloader_train):
+                batch_inputs, batch_conditions = batch_inputs.to(device), batch_conditions.to(device)
                 sanity_check = model(x=batch_inputs, c=batch_conditions, rev=False)
 
-                sanity_data = np.append(sanity_data, sanity_check.numpy()[:, ..., 0])
+                sanity_data = np.append(sanity_data, sanity_check.cpu().detach().numpy()[:, ..., 0])
             # Plot sanity check data
             latent_gauss(model_name, sanity_data, "")
 
@@ -153,3 +159,5 @@ if __name__== "__main__":
 
     #sanity_check(device, model_list)
    # generate_from_testset(device, model_list)
+
+
