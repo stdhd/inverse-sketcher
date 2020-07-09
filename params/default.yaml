@@ -21,3 +21,4 @@ model_params: {dim_cond: [1,256,256], conv_size_cond: 3,
 
 model_name: "default"
 load_model: False
+architecture: "glow"

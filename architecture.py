@@ -5,9 +5,17 @@ import torch.optim
 import FrEIA.framework as Ff
 import FrEIA.modules as Fm
 
+from aiocoupling_fc import AIO_Block as AIOFC
+from aiocoupling_conv import AIO_Block as AIOCONV
+
 
 def get_model_by_name(name):
-    return baseline()
+    if name.lower() == "glow":
+        return baseline()
+    elif name.lower() == "aio":
+        return baseline_aio()
+    else:
+        raise(ValueError("Model architecture {} is not defined".format(name)))
 
 def random_orthog(n):
     w = torch.randn(n, n)
@@ -35,6 +43,92 @@ def sub_fc(ch_hidden, num_hidden_layers=0):
         nn.Linear(ch_hidden, ch_out))
 
 
+def baseline_aio():
+    cond = CondNet()
+
+    nodes = [Ff.InputNode(3, 64, 64)]
+    # outputs of the cond. net at different resolution levels
+    conditions = [Ff.ConditionNode(64, 64, 64),
+                  Ff.ConditionNode(128, 32, 32),
+                  Ff.ConditionNode(128, 16, 16),
+                  Ff.ConditionNode(512)]
+
+    split_nodes = []
+
+    for k in range(8):
+        nodes.append(Ff.Node(nodes[-1], AIOCONV,
+                             {'subnet_constructor': sub_conv(64, 3, 0),
+                              'clamp': 1.0},
+                             conditions=conditions[0],
+                             name=F'block_{k}'))
+        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(3)}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+
+
+    nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
+
+    for k in range(10):
+        nodes.append(Ff.Node(nodes[-1], AIOCONV,
+                             {
+                                 'subnet_constructor': sub_conv(128, 3, 0),
+                                 'clamp': 0.9,
+                             },
+                             conditions=conditions[1],
+                             name=F'block_{k + 2}'))
+        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(12)}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+
+
+    # split off 8/12 ch
+    nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
+                         {'split_size_or_sections': [4, 8], 'dim': 0}))
+    split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
+
+    nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
+
+    for k in range(8):
+        nodes.append(Ff.Node(nodes[-1], AIOCONV,
+                             {
+                                 'subnet_constructor': sub_conv(256, 3 if k%2 else 1, 0),
+                                 'clamp': 1.0,
+                             },
+                             conditions=conditions[2],
+                             name=F'block_{k + 6}'))
+        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+
+
+    # split off 8/16 ch
+    nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
+                         {'split_size_or_sections': [8, 8], 'dim': 0}))
+    split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
+    nodes.append(Ff.Node(nodes[-1], Fm.Flatten, {}, name='flatten'))
+
+    # fully_connected part
+    for k in range(4):
+        nodes.append(Ff.Node(nodes[-1], AIOFC,
+                             {
+                                 'clamp': 0.6,
+                                 'subnet_constructor': sub_fc(512, 1)
+                             },
+                             conditions=conditions[3],
+                             name=F'block_{k + 10}'))
+
+        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+    # concat everything
+    nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
+                         Fm.Concat1d, {'dim': 0}))
+    nodes.append(Ff.OutputNode(nodes[-1]))
+    inn = SketchINN(cond)
+    inn.build_inn(nodes, split_nodes, conditions)
+    return inn
+
+
 def baseline():
     cond = CondNet()
 
@@ -53,7 +147,8 @@ def baseline():
                               'clamp': 1.0},
                              conditions=conditions[0],
                              name=F'block_{k}'))
-        nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(3)}))
+        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(3)}))
         #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
@@ -67,7 +162,8 @@ def baseline():
                              },
                              conditions=conditions[1],
                              name=F'block_{k + 2}'))
-        nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(12)}))
+        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(12)}))
         #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
@@ -86,7 +182,8 @@ def baseline():
                              },
                              conditions=conditions[2],
                              name=F'block_{k + 6}'))
-        nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
+        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
         #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
@@ -115,7 +212,6 @@ def baseline():
     inn = SketchINN(cond)
     inn.build_inn(nodes, split_nodes, conditions)
     return inn
-
 
 class CondNet(nn.Module):
     '''conditioning network'''
@@ -248,6 +344,10 @@ class LearnedActNorm(nn.Module):
 
         self.M = nn.Parameter(M, requires_grad=True)
         self.b = nn.Parameter(b, requires_grad=True)
+        if len(dims_in) > 1:
+            self.n_pixels = dims_in[1] * dims_in[2]
+        else:
+            self.n_pixels = 1
         self.activation = nn.Softplus(beta=0.5)
 
 
@@ -259,10 +359,7 @@ class LearnedActNorm(nn.Module):
             return [(x[0] - self.b)/ self.activation(self.M) ]
 
     def jacobian(self, x, rev=False):
-        if rev:
-            return - torch.log(self.activation(self.M))
-        else:
-            return torch.log(self.activation(self.M))
+        return ((-1)**rev * self.n_pixels) * (torch.log(self.activation(self.M) + 1e-12).sum())
 
     def output_dims(self, input_dims):
         return input_dims

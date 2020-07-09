@@ -14,16 +14,12 @@ class AIO_Block(nn.Module):
                  act_norm=1.,
                  act_norm_type='SOFTPLUS',
                  permute_soft=False,
-                 dropout=0.0,
-                 num_layers=2,
-                 conv_size=None,
-                 hidden_size=None):
+                 learned_householder_permutation=0,
+                 welling_permutation=False):
 
         super().__init__()
 
         channels = dims_in[0][0]
-        self.ndims = len(dims_in[0])
-
         self.split_len1 = channels - channels // 2
         self.split_len2 = channels // 2
         self.splits = [self.split_len1, self.split_len2]
@@ -31,8 +27,10 @@ class AIO_Block(nn.Module):
         self.in_channels = channels
         self.clamp = clamp
         self.GIN = gin_block
-        if not all([tuple(dims_c[i][1:]) == tuple(dims_in[0][1:]) for i in range(len(dims_c))]):
-            raise(ValueError(F"Dimensions of input and one or more conditions don't agree: {dims_c} vs {dims_in}."))
+        self.welling_perm = welling_permutation
+        self.householder = learned_householder_permutation
+
+        #self.identity = torch.eye(channels).cuda()
 
         if act_norm_type == 'SIGMOID':
             act_norm = np.log(act_norm)
@@ -48,7 +46,9 @@ class AIO_Block(nn.Module):
             raise ValueError('Please, SIGMOID, SOFTPLUS or EXP, as actnorm type')
 
         assert act_norm > 0., "please, this is not allowed. don't do it. take it... and go."
-        self.act_norm_trigger = True
+        self.act_norm = nn.Parameter(torch.ones(1, self.in_channels, 1, 1) * float(act_norm))
+        self.act_offset = nn.Parameter(torch.zeros(1, self.in_channels, 1, 1))
+
 
         if permute_soft:
             w = special_ortho_group.rvs(channels)
@@ -56,64 +56,71 @@ class AIO_Block(nn.Module):
             w = np.zeros((channels,channels))
             for i,j in enumerate(np.random.permutation(channels)):
                 w[i,j] = 1.
-        w_inv = w.T
 
-        self.conditional = (len(dims_c) > 0)
-        condition_length = sum([dims_c[i][0] for i in range(len(dims_c))])
-        if not conv_size is None:
-            #Convolutional Block
-            self.act_norm = nn.Parameter(torch.ones(1, self.in_channels, 1, 1) * float(act_norm))
-            self.act_offset = nn.Parameter(torch.zeros(1, self.in_channels, 1, 1))
-            self.s = subnet_constructor(num_layers, dims_in[0][1], self.split_len1 + condition_length, hidden_size, self.split_len2*2, conv_size=3, dropout=dropout)
+        if self.householder:
+            self.vk_householder = nn.Parameter(0.2 * torch.randn(self.householder, channels), requires_grad=True)
+            self.w = None
+            self.w_inv = None
+            self.w_0 = nn.Parameter(torch.FloatTensor(w), requires_grad=False)
+        else:
             self.w = nn.Parameter(torch.FloatTensor(w).view(channels, channels, 1, 1),
                                   requires_grad=False)
             self.w_inv = nn.Parameter(torch.FloatTensor(w.T).view(channels, channels, 1, 1),
                                   requires_grad=False)
-            self.permConv = F.conv2d
-        else:
-            #FC block
-            self.act_norm = nn.Parameter(torch.ones(1, self.in_channels) * float(act_norm))
-            self.act_offset = nn.Parameter(torch.zeros(1, self.in_channels))
-            self.s = subnet_constructor(num_layers, self.split_len1 + condition_length, self.split_len2*2, internal_size=hidden_size, dropout=dropout)
-            self.w = nn.Parameter(torch.FloatTensor(w).view(channels, channels),
-                                  requires_grad=False)
-            self.w_inv = nn.Parameter(torch.FloatTensor(w.T).view(channels, channels),
-                                  requires_grad=False)
-            self.permConv = torch.matmul
+
+        self.conditional = (len(dims_c) > 0)
+        condition_length = sum([dims_c[i][0] for i in range(len(dims_c))])
+
+        self.s = subnet_constructor(self.split_len1 + condition_length, 2 * self.split_len2)
         self.last_jac = None
+
+    def construct_householder_permutation(self):
+        w = self.w_0
+        for vk in self.vk_householder:
+            w = torch.mm(w, torch.eye(self.in_channels).cuda() - 2 * torch.ger(vk, vk) / torch.dot(vk, vk))
+
+        return w.unsqueeze(2).unsqueeze(3), w.t().contiguous().unsqueeze(2).unsqueeze(3)
 
     def log_e(self, s):
         s = self.clamp * torch.tanh(0.1 * s)
         if self.GIN:
-            s -= torch.mean(s, dim=(1), keepdim=True)
+            s -= torch.mean(s, dim=(1,2,3), keepdim=True)
         return s
 
     def permute(self, x, rev=False):
         scale = self.actnorm_activation( self.act_norm)
         if rev:
-            return (self.permConv(x, self.w_inv) - self.act_offset) / scale
+            return (F.conv2d(x, self.w_inv) - self.act_offset) / scale
         else:
-            return self.permConv(x * scale + self.act_offset, self.w)
+            return F.conv2d(x * scale + self.act_offset, self.w)
 
+    def pre_permute(self, x, rev=False):
+        if rev:
+            return F.conv2d(x, self.w)
+        else:
+            return F.conv2d(x, self.w_inv)
 
     def affine(self, x, a, rev=False):
         ch = x.shape[1]
         sub_jac = self.log_e(a[:,:ch])
-        if sub_jac.ndim == 4:
-            jac_sum = torch.sum(sub_jac, dim=(1, 2, 3))
-        else:
-            jac_sum = torch.sum(sub_jac, dim=(1))
         if not rev:
             return (x * torch.exp(sub_jac) + 0.1 * a[:,ch:],
-                    jac_sum)
+                    torch.sum(sub_jac, dim=(1,2,3)))
         else:
             return ((x - 0.1 * a[:,ch:]) * torch.exp(-sub_jac),
-                    -jac_sum)
+                    -torch.sum(sub_jac, dim=(1,2,3)))
 
     def forward(self, x, c=[], rev=False):
+        if self.householder:
+            self.w, self.w_inv = self.construct_householder_permutation()
+
         if rev:
             x = [self.permute(x[0], rev=True)]
+        elif self.welling_perm:
+            x = [self.pre_permute(x[0], rev=False)]
+
         x1, x2 = torch.split(x[0], self.splits, dim=1)
+
         if not rev:
             a1 = self.s(torch.cat([x1, *c], 1) if self.conditional else x1)
             x2, j2 = self.affine(x2, a1)
@@ -123,13 +130,15 @@ class AIO_Block(nn.Module):
 
         self.last_jac = j2
         x_out = torch.cat((x1, x2), 1)
-        if x_out.ndim == 4:
-            n_pixels = x_out.shape[2] * x_out.shape[3]
-        else:
-            n_pixels = 1
+
+        n_pixels = x_out.shape[2] * x_out.shape[3]
         self.last_jac += ((-1)**rev * n_pixels) * (torch.log(self.actnorm_activation(self.act_norm) + 1e-12).sum())
+
         if not rev:
             x_out = self.permute(x_out, rev=False)
+        elif self.welling_perm:
+            x_out = self.pre_permute(x_out, rev=True)
+
         return [x_out]
 
     def jacobian(self, x, c=[], rev=False):

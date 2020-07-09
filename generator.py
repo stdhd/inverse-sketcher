@@ -1,6 +1,6 @@
 import torch
 import train
-import model
+#import model
 import os
 import argparse
 from torchvision import transforms
@@ -9,6 +9,7 @@ import random
 from architecture import get_model_by_name
 import numpy as np
 import scipy.stats
+from tqdm import tqdm
 
 def load_trained_model(file):
     """
@@ -21,9 +22,19 @@ def load_trained_model(file):
         state_dicts = torch.load(file, map_location=torch.device('cpu'))
     except:
         raise (RuntimeError("Could not load training result from file " + file + "."))
+    if state_dicts.get("architecture", False):
+        mod = get_model_by_name(state_dicts.get("architecture"))#model.cINN(**state_dicts.get("model_params")).to(device)
+        mod.model.load_state_dict(state_dicts["model_state_dict"])
 
-    mod = get_model_by_name('')#model.cINN(**state_dicts.get("model_params")).to(device)
-    mod.model.load_state_dict(state_dicts["model_state_dict"])
+    else:
+        try:
+            mod = get_model_by_name("glow")
+            mod.model.load_state_dict(state_dicts["model_state_dict"])
+
+        except:
+            mod = get_model_by_name("aio")
+            mod.model.load_state_dict(state_dicts["model_state_dict"])
+
     split = (state_dicts["train_split"], state_dicts["test_split"])
     return mod, split, state_dicts
 
@@ -68,7 +79,7 @@ def generate_from_testset(device, model_list):
             print("generate folder exists, so plot is overwritten")
 
         with torch.set_grad_enabled(False):
-            for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(dataloader_test):
+            for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(tqdm(dataloader_test, "Visualization")):
                 batch_conditions = batch_conditions.to(device)
                 gauss_samples = torch.randn(batch_inputs.shape[0],
                                             batch_inputs.shape[1] * batch_inputs.shape[2] * batch_inputs.shape[3]).to(
@@ -103,8 +114,8 @@ def generate_from_testset(device, model_list):
 def sanity_check(device, model_list):
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
-
         model, split, params = load_trained_model(os.path.join("saved_models", model_name, "default.tar"))
+
         dataloader_train, dataloader_test, ___, test_split = train.create_dataloaders(
             "dataset/SketchyDatabase"
             "/256x256",
@@ -118,7 +129,7 @@ def sanity_check(device, model_list):
 
         with torch.set_grad_enabled(False):
             sanity_data = np.array([])
-            for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(dataloader_train):
+            for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(tqdm(dataloader_train, "Sanity Check")):
                 batch_inputs, batch_conditions = batch_inputs.to(device), batch_conditions.to(device)
                 sanity_check = model(x=batch_inputs, c=batch_conditions, rev=False)
 
@@ -155,9 +166,7 @@ if __name__== "__main__":
         device = torch.device('cpu')
         print("CUDA disabled.")
 
-    model_list = ["default_0705_101"]
+    model_list = ["default_0709_0", "default_0709_8"]
 
-    #sanity_check(device, model_list)
-   # generate_from_testset(device, model_list)
-
-
+    sanity_check(device, model_list)
+    generate_from_testset(device, model_list)

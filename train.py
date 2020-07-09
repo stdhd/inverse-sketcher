@@ -94,7 +94,7 @@ def get_optimizer(param, trainables):
 
 
 def get_model(param):
-    return get_model_by_name("").to(device)#cINN(**param.get("model_params")).to(device)
+    return get_model_by_name(param["architecture"]).to(device)#cINN(**param.get("model_params")).to(device)
 
 
 def load_state(param):
@@ -150,8 +150,8 @@ def save_state(param, model_state, optim_state, scheduler_state, epoch, running_
         'test_ratio': param['test_ratio'],
         'only_classes': param.get('only_classes', None),
         'only_one_sample': param.get('only_one_sample', False),
-        'scheduler_state_dict': scheduler_state
-
+        'scheduler_state_dict': scheduler_state,
+        'architecture': param.get("architecture")
     }, f"{path}.tar")
 
 def validate(model, dataloader_test):
@@ -183,7 +183,7 @@ if __name__ == "__main__":
         print("CUDA disabled.")
 
     # Define dictionary of hyper parameters
-    list_hyper_params = ["default.yaml"]
+    list_hyper_params = ["default_aio.yaml"]
 
     # Loop over hyper parameter configurations
     pp = pprint.PrettyPrinter(indent=4)
