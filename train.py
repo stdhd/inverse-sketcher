@@ -230,7 +230,8 @@ if __name__ == "__main__":
                 loss.backward()
                 epoch_loss += loss.item()/len(dataloader_train)
                 optimizer.step()
-            scheduler.step(validate(model, dataloader_test))
+            scheduler.step()
+            #scheduler.step(validate(model, dataloader_test))
             print("Epoch {} / {} Loss: {}".format(e + 1, params["n_epochs"], epoch_loss))
             save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
 

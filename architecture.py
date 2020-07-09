@@ -54,7 +54,7 @@ def baseline():
                              conditions=conditions[0],
                              name=F'block_{k}'))
         nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(3)}))
-        nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
     nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
@@ -68,7 +68,7 @@ def baseline():
                              conditions=conditions[1],
                              name=F'block_{k + 2}'))
         nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(12)}))
-        nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
     # split off 8/12 ch
@@ -87,7 +87,7 @@ def baseline():
                              conditions=conditions[2],
                              name=F'block_{k + 6}'))
         nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
-        nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
     # split off 8/16 ch
@@ -107,7 +107,7 @@ def baseline():
                              name=F'block_{k + 10}'))
 
         nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
-        nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
     # concat everything
     nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
                          Fm.Concat1d, {'dim': 0}))

@@ -23,6 +23,8 @@ Starting training for params:
     'only_one_sample': False,
     'optimizer': 'Adam',
     'optimizer_params': {'lr': 0.0002, 'weight_decay': 1e-05},
-    'save_dir': 'saved_models/default_0708_0',
+    'save_dir': 'saved_models/default_0709_0',
     'test_ratio': 0.1}
-Epoch 1 / 400 Loss: 4.690052715719662
+Epoch 1 / 400 Loss: -3.7112045394307183
+Epoch 2 / 400 Loss: -3.9168043528063636
+Epoch 3 / 400 Loss: -3.9688007074475147
