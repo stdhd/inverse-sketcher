@@ -13,11 +13,12 @@ from torch.utils.data import DataLoader
 import os
 import torchvision
 import yaml
-from architecture import get_model_by_name
+from architecture import get_model_by_params
 from datetime import date
 import pprint
 from torchvision import transforms
 from PIL import ImageFile
+import matplotlib.pyplot as plt
 
 def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     """
@@ -94,7 +95,7 @@ def get_optimizer(param, trainables):
 
 
 def get_model(param):
-    return get_model_by_name(param["architecture"]).to(device)#cINN(**param.get("model_params")).to(device)
+    return get_model_by_params(param).to(device)#cINN(**param.get("model_params")).to(device)
 
 
 def load_state(param):
@@ -183,7 +184,7 @@ if __name__ == "__main__":
         print("CUDA disabled.")
 
     # Define dictionary of hyper parameters
-    list_hyper_params = ["default_aio.yaml"]
+    list_hyper_params = ["default.yaml"]
 
     # Loop over hyper parameter configurations
     pp = pprint.PrettyPrinter(indent=4)
@@ -220,6 +221,7 @@ if __name__ == "__main__":
             split = (train_split, test_split)
 
         t_start = time()
+        loss_summary = np.zeros(0)
         print("Starting training for params:")
         pp.pprint(params)
         for e in range(params["n_epochs"]):
@@ -232,16 +234,28 @@ if __name__ == "__main__":
                 loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / gauss_output.shape[1]
                 loss.backward()
                 epoch_loss += loss.item()/len(dataloader_train)
+                loss_summary = np.append(loss_summary, loss.item())
                 optimizer.step()
             scheduler.step()
             #scheduler.step(validate(model, dataloader_test))
+            np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}'.format(params["model_name"],  str(epoch))), loss_summary, fmt='%1.3f')
             print("Epoch {} / {} Loss: {}".format(e + 1, params["n_epochs"], epoch_loss))
 
             if not args.nocheckpoints:
                 save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
+
+        np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}_FINAL'.format(params["model_name"], str(epoch))),
+                   loss_summary, fmt='%1.3f')
+        f = plt.figure()
+        plt.plot(loss_summary)
+        plt.xlabel('Batch')
+        plt.ylabel('Batch Loss')
+        plt.savefig(os.path.join(params["save_dir"], 'batchloss_{}.pdf'.format(params["model_name"]) ))
+        plt.close()
+
+
         if args.nocheckpoints:
-            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss,
-                       split)
+            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
             print("Model is saved to {}".format(params["save_dir"]))
 
         print('%.3i \t%.6f min' % (epoch, (time() - t_start) / 60.))
