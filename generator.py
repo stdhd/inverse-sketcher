@@ -6,7 +6,7 @@ import argparse
 from torchvision import transforms
 import matplotlib.pyplot as plt
 import random
-from architecture import get_model_by_name
+from architecture import get_model_by_params
 import numpy as np
 import scipy.stats
 from tqdm import tqdm
@@ -23,16 +23,16 @@ def load_trained_model(file):
     except:
         raise (RuntimeError("Could not load training result from file " + file + "."))
     if state_dicts.get("architecture", False):
-        mod = get_model_by_name(state_dicts.get("architecture"))#model.cINN(**state_dicts.get("model_params")).to(device)
+        mod = get_model_by_params(state_dicts.get("architecture"))#model.cINN(**state_dicts.get("model_params")).to(device)
         mod.model.load_state_dict(state_dicts["model_state_dict"])
 
     else:
         try:
-            mod = get_model_by_name("glow")
+            mod = get_model_by_params("glow")
             mod.model.load_state_dict(state_dicts["model_state_dict"])
 
         except:
-            mod = get_model_by_name("aio")
+            mod = get_model_by_params("aio")
             mod.model.load_state_dict(state_dicts["model_state_dict"])
 
     split = (state_dicts["train_split"], state_dicts["test_split"])
@@ -147,8 +147,9 @@ def load_checkpoint(filepath):
     model.eval()
     return model
 
-def save__architecture_and_parameters(model):
-    checkpoint = {'model': get_model_by_name(""),
+
+def save__architecture_and_parameters(model, param_dict):
+    checkpoint = {'model': get_model_by_params(param_dict),
                   'state_dict': model.state_dict()}
     torch.save(checkpoint, 'checkpoint.pth')
 

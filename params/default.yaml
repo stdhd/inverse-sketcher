@@ -9,15 +9,20 @@ test_ratio: 0.1
 #Model
 model_params: {dim_cond: [1,256,256], conv_size_cond: 3,
                dim_cond_out: [3,256,256],
-               cond_dropout: 0.0,
+               cond_dropout: 0.3,
                num_cond_layers: 3,
                dim_x: [3,256,256],
                n_blocks: 20,
-               clamping: 0.9,
                conv_size: 3,
                layers_per_block: 4, #includes input and output layer, so 1 means no hidden layers
-               dropout: 0.0,
-               permute_soft: False}
+               dropout_fc: 0.3,
+               permute: "soft",     #random, soft, None
+               blocks_per_group:[4, 6, 6, 4],
+               clamping_per_group:[1.0, 1.0, 1.0, 0.6],
+               kernel_size_per_group:[3, 3, [3, 3, 3, 3, 3, 3]],
+               hidden_layers_per_group:[0, 0, 0, 0],
+               act_norm: False
+}
 
 model_name: "default"
 load_model: False
