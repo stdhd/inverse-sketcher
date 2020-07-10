@@ -22,18 +22,13 @@ def load_trained_model(file):
         state_dicts = torch.load(file, map_location=torch.device('cpu'))
     except:
         raise (RuntimeError("Could not load training result from file " + file + "."))
-    if state_dicts.get("architecture", False):
-        mod = get_model_by_params(state_dicts.get("architecture"))#model.cINN(**state_dicts.get("model_params")).to(device)
-        mod.model.load_state_dict(state_dicts["model_state_dict"])
 
-    else:
-        try:
-            mod = get_model_by_params("glow")
-            mod.model.load_state_dict(state_dicts["model_state_dict"])
+    if not "architecture" in state_dicts:
+        state_dicts["architecture"] = 'glow'
+        print('Field ARCHITECTURE not found in state dict. Will use glow...')
 
-        except:
-            mod = get_model_by_params("aio")
-            mod.model.load_state_dict(state_dicts["model_state_dict"])
+    mod = get_model_by_params(state_dicts)
+    mod.model.load_state_dict(state_dicts["model_state_dict"])
 
     split = (state_dicts["train_split"], state_dicts["test_split"])
     return mod, split, state_dicts
@@ -123,7 +118,7 @@ def sanity_check(device, model_list):
             params["test_ratio"],
             only_classes=params.get("only_classes", None),
             split=split,
-            only_one_sample=params.get("only_one_sample", False)
+            only_one_sample=params.get("only_one_sample", False),
         )
         model.to(device)
 
@@ -167,7 +162,7 @@ if __name__== "__main__":
         device = torch.device('cpu')
         print("CUDA disabled.")
 
-    model_list = ["default_0709_0", "default_0709_8"]
+    model_list = ["default_0710_0g"]
 
     sanity_check(device, model_list)
     generate_from_testset(device, model_list)
