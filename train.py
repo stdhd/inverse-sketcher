@@ -19,6 +19,7 @@ import pprint
 from torchvision import transforms
 from PIL import ImageFile
 import matplotlib.pyplot as plt
+import socket
 
 def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     """
@@ -49,6 +50,11 @@ def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
 
         os.mkdir(save_dir_mod)
         param["save_dir"] = save_dir_mod
+
+        # Copy yaml to training dir
+        with open(os.path.join (save_dir_mod, 'modelcopy.yaml'), 'w') as outfile:
+            yaml.dump(param, outfile, default_flow_style=True)
+
     else:
         raise RuntimeError("No folders can be created in read-only mode.")
 
@@ -58,7 +64,7 @@ def get_transform():
     return transforms.Resize((64, 64))
 
 
-def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None, only_one_sample=False):
+def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None, only_one_sample=False, num_workers=os.cpu_count()):
     """
     Create data loaders from ImageDataSet according parameters. If split is provided, it is used by the data loader.
     :param data_path: path of root directory of data set, while directories 'photo' and 'sketch' are sub directories
@@ -66,6 +72,8 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
     :param test_ratio: 0.1 means 10% test data
     :param split: optional train/test split
     :param only_classes: optional list of folder names to retrieve training data from
+    :param only_one_sample: Load only one sketch and one image
+    :param num_workers: number of workers threads for loading sketches and images from drive
     :return: train and test dataloaders and train and test split
     """
     if only_one_sample:
@@ -79,8 +87,8 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
     else:
         train_split, test_split = split[0], split[1]
 
-    dataloader_train = DataLoader(train_split, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count(), drop_last=True)
-    dataloader_test = DataLoader(test_split, batch_size=batch_size, shuffle=False, num_workers=os.cpu_count())
+    dataloader_train = DataLoader(train_split, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
+    dataloader_test = DataLoader(test_split, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     return dataloader_train, dataloader_test, train_split, test_split
 
@@ -222,6 +230,7 @@ if __name__ == "__main__":
 
         t_start = time()
         loss_summary = np.zeros(0)
+        print(socket.gethostname())
         print("Starting training for params:")
         pp.pprint(params)
         for e in range(params["n_epochs"]):
@@ -252,7 +261,6 @@ if __name__ == "__main__":
         plt.ylabel('Batch Loss')
         plt.savefig(os.path.join(params["save_dir"], 'batchloss_{}.pdf'.format(params["model_name"]) ))
         plt.close()
-
 
         if args.nocheckpoints:
             save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
