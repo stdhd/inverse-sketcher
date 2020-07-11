@@ -4,7 +4,6 @@ import torch.optim
 
 import FrEIA.framework as Ff
 import FrEIA.modules as Fm
-from aiocoupling import AIO_Block
 
 class GraphNetProcessCondition(Ff.ReversibleGraphNet):
     """Subclass of ReversibleGraphNet, with added condition preprocessing
