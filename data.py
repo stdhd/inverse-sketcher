@@ -124,8 +124,6 @@ class ImageDataSet(Dataset):
         meta = self.__meta[idx]
         if self.load_on_request:
 
-        if self.load_on_request:
-
             path_sketch = meta.get_sketch()
             path_real = meta.get_real()
 

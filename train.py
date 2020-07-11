@@ -163,6 +163,7 @@ def save_state(param, model_state, optim_state, scheduler_state, epoch, running_
     }, f"{path}.tar")
 
 def validate(model, dataloader_test):
+    model.eval()
     with torch.no_grad():
         val_loss = 0
         for batch, (sketch, real, label) in enumerate(tqdm(dataloader_test)):
@@ -170,6 +171,7 @@ def validate(model, dataloader_test):
             gauss_output = model(real, sketch)
             loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / gauss_output.shape[1]
             val_loss += loss/len(dataloader_test)
+    model.train()
     return val_loss
 
 
@@ -244,10 +246,11 @@ if __name__ == "__main__":
                 epoch_loss += loss.item()/len(dataloader_train)
                 loss_summary = np.append(loss_summary, loss.item())
                 optimizer.step()
+                break
             scheduler.step()
             #scheduler.step(validate(model, dataloader_test))
             np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}'.format(params["model_name"],  str(epoch))), loss_summary, fmt='%1.3f')
-            print("Epoch {} / {} Training Loss: {}, Validation Loss: {}".format(e + 1, params["n_epochs"], epoch_loss, validate()))
+            print("Epoch {} / {} Training Loss: {}, Validation Loss: {}".format(e + 1, params["n_epochs"], epoch_loss, validate(model, dataloader_test)))
 
             if not args.nocheckpoints:
                 save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
