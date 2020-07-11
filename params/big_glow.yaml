@@ -1,0 +1,30 @@
+batch_size: 16
+n_epochs: 400
+
+#Optimizer
+optimizer: Adam
+optimizer_params: {lr: 0.0002, weight_decay: 0.00001}
+test_ratio: 0.1
+
+#Model
+model_params: {dim_cond: [1,256,256], conv_size_cond: 3,
+               dim_cond_out: [3,256,256],
+               cond_dropout: 0.3,
+               num_cond_layers: 3,
+               dim_x: [3,256,256],
+               n_blocks: 20,
+               conv_size: 3,
+               layers_per_block: 4, #includes input and output layer, so 1 means no hidden layers
+               dropout_fc: 0,
+               permute: "random",     #random, soft, None
+               blocks_per_group:[8, 12, 10, 8],
+               clamping_per_group:[0.9, 0.9, 0.9, 0.8],
+               kernel_size_per_group:[3, 3, [3, 1, 3, 1, 3, 1, 3, 1, 3, 1]],
+               hidden_layers_per_group:[3, 3, 2, 4],
+               fc_size: 3072,
+               act_norm: False
+}
+
+model_name: "default"
+load_model: False
+architecture: "glow"

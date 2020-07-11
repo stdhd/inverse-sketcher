@@ -147,6 +147,7 @@ def baseline_glow(m_params):
                              {'subnet_constructor': sub_conv(64, m_params['kernel_size_per_group'][0],
                                                              m_params['hidden_layers_per_group'][0]),
                               'clamp': m_params['clamping_per_group'][0]},
+                             },
                              conditions=conditions[0],
                              name=F'block_{k}'))
         if m_params['permute'] == 'random':

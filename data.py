@@ -53,6 +53,10 @@ class ImageDataSet(Dataset):
         self.only_one_sample = only_one_sample
         self.load_on_request = load_on_request
         self.noise_factor = noise_factor
+<<<<<<< HEAD
+        self.load_on_request = load_on_request
+=======
+>>>>>>> 96bb8ec48af9d4256337d01e0813e0fd95eec993
         self.get_class_numbers()
         self.__process_meta()
 
@@ -122,6 +126,18 @@ class ImageDataSet(Dataset):
             idx = idx.to(dtype=torch.int)
         meta = self.__meta[idx]
         if self.load_on_request:
+
+        if self.load_on_request:
+
+            path_sketch = meta.get_sketch()
+            path_real = meta.get_real()
+
+            # Please leave this here, as the dataset in my colab has some duplicates:
+            if path_sketch.endswith(' (1).png'):
+                path_sketch = path_sketch.split(" ")[0] + ".png"
+
+            sketch = Image.open(path_sketch).convert("L")
+            image = Image.open(path_real)
 
             path_sketch = meta.get_sketch()
             path_real = meta.get_real()

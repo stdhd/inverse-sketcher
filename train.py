@@ -191,7 +191,7 @@ if __name__ == "__main__":
         print("CUDA disabled.")
 
     # Define dictionary of hyper parameters
-    list_hyper_params = ["default.yaml"]
+    list_hyper_params = ["default_glow.yaml"]
 
     # Loop over hyper parameter configurations
     pp = pprint.PrettyPrinter(indent=4)
