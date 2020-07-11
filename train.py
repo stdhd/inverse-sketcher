@@ -168,6 +168,8 @@ def validate(model, dataloader_test):
         val_loss = 0
         for batch, (sketch, real, label) in enumerate(tqdm(dataloader_test)):
             sketch, real, label = sketch.to(device), real.to(device), label.to(device)
+            if params.get("half_precision", False):
+                sketch, real = sketch.half(), real.half()
             gauss_output = model(real, sketch)
             loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / gauss_output.shape[1]
             val_loss += loss/len(dataloader_test)
@@ -237,7 +239,8 @@ if __name__ == "__main__":
                                                                                             only_one_sample=params.get('only_one_sample', False),
                                                                                             load_on_request=args.nopreload)
             split = (train_split, test_split)
-
+        if params.get("half_precision", False):
+            model.half()
         t_start = time()
         loss_summary = np.zeros(0)
         print(socket.gethostname())
@@ -249,13 +252,14 @@ if __name__ == "__main__":
             for batch, (sketch, real, label) in enumerate(tqdm(dataloader_train)):
                 optimizer.zero_grad()
                 sketch, real, label = sketch.to(device), real.to(device), label.to(device)
+                if params.get("half_precision", False):
+                    sketch, real = sketch.half(), real.half()
                 gauss_output = model(real, sketch)
                 loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / gauss_output.shape[1]
                 loss.backward()
                 epoch_loss += loss.item()/len(dataloader_train)
                 loss_summary = np.append(loss_summary, loss.item())
                 optimizer.step()
-                break
             scheduler.step()
             #scheduler.step(validate(model, dataloader_test))
             np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}'.format(params["model_name"],  str(epoch))), loss_summary, fmt='%1.3f')

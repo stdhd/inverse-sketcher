@@ -21,10 +21,10 @@ model_params: {dim_cond: [1,256,256], conv_size_cond: 3,
                clamping_per_group:[0.9, 0.9, 0.9, 0.8],
                kernel_size_per_group:[3, 3, [3, 1, 3, 1, 3, 1, 3, 1, 3, 1]],
                hidden_layers_per_group:[3, 3, 2, 4],
-               fc_size: 4096,
+               fc_size: 3072,
                act_norm: False
 }
-
+half_precision: True
 model_name: "bigger_glow"
 load_model: False
 architecture: "glow"
