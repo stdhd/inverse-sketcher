@@ -139,3 +139,5 @@ saved_models/
 run_scripts/
 params/
 generator/
+logs/
+log*.txt

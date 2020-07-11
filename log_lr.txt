@@ -1,2 +1,0 @@
-CUDA enabled.
-Reading paramfile params/default_aio.yaml
