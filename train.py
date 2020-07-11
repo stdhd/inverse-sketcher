@@ -179,8 +179,9 @@ if __name__ == "__main__":
     # Determine, whether cuda will be enabled
     # use x.to_device(args.device)
     parser = argparse.ArgumentParser(description='PyTorch')
-    parser.add_argument('--nocuda', action='store_true',
-                        help='Disable CUDA')
+    parser.add_argument('modelnames', nargs='+', help='model names to train')
+    parser.add_argument('--nocuda', help='Disable CUDA', action='store_true')
+    parser.add_argument('--nopreload', help='Disable pre-loading of image data', action='store_true')
     parser.add_argument('--nocheckpoints', action='store_true',
                         help='Disable storing training state checkpoints. Model will be saved at the end of training.')
     args = parser.parse_args()
@@ -193,11 +194,17 @@ if __name__ == "__main__":
         print("CUDA disabled.")
 
     # Define dictionary of hyper parameters
-    list_hyper_params = ["clamp_glow.yaml"]
+    if not args.modelnames is None:
+        list_hyper_params = args.modelnames
+    else:
+        print("No model name specified in command line arguments. Will use hard-coded model list...")
+        list_hyper_params = ["clamp_glow"]
 
     # Loop over hyper parameter configurations
     pp = pprint.PrettyPrinter(indent=4)
     for param_name in list_hyper_params:
+        if not param_name.endswith(".yaml"):
+            param_name = "{}.yaml".format(param_name)
         params = parse_yaml(os.path.join("params", param_name))
         if not 'only_one_sample' in params:
             params['only_one_sample'] = False
@@ -215,7 +222,8 @@ if __name__ == "__main__":
                                                                                             params["test_ratio"],
                                                                                             split=split,
                                                                                             only_classes=params.get('only_classes', None),
-                                                                                            only_one_sample=params.get('only_one_sample', False))
+                                                                                            only_one_sample=params.get('only_one_sample', False),
+                                                                                            load_on_request=args.nopreload)
         else:
             # Init new training with new split
             model = get_model(params)
@@ -226,7 +234,8 @@ if __name__ == "__main__":
                                                                                             params["batch_size"],
                                                                                             params["test_ratio"],
                                                                                             only_classes=params.get('only_classes', None),
-                                                                                            only_one_sample=params.get('only_one_sample', False))
+                                                                                            only_one_sample=params.get('only_one_sample', False),
+                                                                                            load_on_request=args.nopreload)
             split = (train_split, test_split)
 
         t_start = time()
