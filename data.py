@@ -76,9 +76,14 @@ class ImageDataSet(Dataset):
                 if os.path.isdir(os.path.join(self.__sketch_dir, classfolder.name)) and (self.only_classes==None or classfolder.name in self.only_classes):
                     with os.scandir(os.path.join(self.__sketch_dir, classfolder.name)) as sketch_iterator:
                         for file in sketch_iterator:
-                            if not file.name.startswith("."):
+                            if not file.name.startswith(".") and not file.name.endswith(".svg"):
                                 path_sketch = os.path.join(self.__sketch_dir, classfolder.name, file.name)
-                                path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("-")[0] + ".jpg")
+                                if "SketchyDatabase" in path_sketch:
+                                    path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("-")[0] + ".jpg")
+                                elif "ShoeV2_F" in path_sketch:
+                                    path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("_")[0] + ".png")
+                                else:
+                                    raise(RuntimeError("Unknown dataset {}".format(self.__sketch_dir.split("/")[1])))
                                 if not os.path.exists(path_real):
                                     logger.error("Warning: Could not find real image named {} corresponding to sketch {}".format(path_real, path_sketch))
                                     continue

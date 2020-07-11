@@ -212,12 +212,13 @@ if __name__ == "__main__":
             print("No checkpoint mode active. No checkpoint is created after every batch. Model will be saved to {} at the end of trainig.".format(params["save_dir"]))
         if params['only_one_sample']:
             print("!!!!!!!!!!!!!!!! ONLY ONE SAMPLE MODE IS ACITVE !!!!!!!!!!!!!!!!")
+        if not params.get("data_path", False):
+            params["data_path"] = "dataset/SketchyDatabase/256x256"
 
         if params.get("load_model", False):
             # Load training progress from existing split
             model, optimizer, epoch, split, scheduler = load_state(params)
-            dataloader_train, dataloader_test, train_split, test_split = create_dataloaders("dataset/SketchyDatabase"
-                                                                                            "/256x256",
+            dataloader_train, dataloader_test, train_split, test_split = create_dataloaders(params["data_path"],
                                                                                             params["batch_size"],
                                                                                             params["test_ratio"],
                                                                                             split=split,
@@ -229,8 +230,7 @@ if __name__ == "__main__":
             model = get_model(params)
             scheduler, optimizer = get_optimizer(params, model.parameters())
             epoch = 0
-            dataloader_train, dataloader_test, train_split, test_split = create_dataloaders("dataset/SketchyDatabase"
-                                                                                            "/256x256",
+            dataloader_train, dataloader_test, train_split, test_split = create_dataloaders(params["data_path"],
                                                                                             params["batch_size"],
                                                                                             params["test_ratio"],
                                                                                             only_classes=params.get('only_classes', None),
@@ -255,7 +255,6 @@ if __name__ == "__main__":
                 epoch_loss += loss.item()/len(dataloader_train)
                 loss_summary = np.append(loss_summary, loss.item())
                 optimizer.step()
-                break
             scheduler.step()
             #scheduler.step(validate(model, dataloader_test))
             np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}'.format(params["model_name"],  str(epoch))), loss_summary, fmt='%1.3f')

@@ -57,11 +57,12 @@ def latent_gauss(model_name, data, path, bins=50):
 def generate_from_testset(device, model_list):
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
+        if not params.get("data_path", False):
+            params["data_path"] = "dataset/SketchyDatabase/256x256"
 
         model, split, params = load_trained_model(os.path.join("saved_models", model_name, "default.tar"))
         __, dataloader_test, ___, test_split = train.create_dataloaders(
-            "dataset/SketchyDatabase"
-            "/256x256",
+            params["data_path"],
             params["batch_size"],
             params["test_ratio"],
             only_classes=params.get("only_classes", None),
@@ -114,10 +115,11 @@ def sanity_check(device, model_list):
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
         model, split, params = load_trained_model(os.path.join("saved_models", model_name, "default.tar"))
+        if not params.get("data_path", False):
+            params["data_path"] = "dataset/SketchyDatabase/256x256"
 
         dataloader_train, dataloader_test, ___, test_split = train.create_dataloaders(
-            "dataset/SketchyDatabase"
-            "/256x256",
+            params["data_path"],
             params["batch_size"],
             params["test_ratio"],
             only_classes=params.get("only_classes", None),
@@ -175,7 +177,7 @@ if __name__ == "__main__":
     else:
         print("No model name specified in command line arguments. Will use hard-coded mode list...")
         model_list = ["default_0710_0g"]
-        
+
     if args.onlygenerate:
         generate_from_testset(device, model_list)
     else:
