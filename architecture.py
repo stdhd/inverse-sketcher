@@ -361,10 +361,10 @@ class LearnedActNorm(nn.Module):
 
         self.M = nn.Parameter(M, requires_grad=True)
         self.b = nn.Parameter(b, requires_grad=True)
-        if len(dims_in) > 1:
-            self.n_pixels = dims_in[1] * dims_in[2]
-        else:
-            self.n_pixels = 1
+        #if len(dims_in) > 1:
+        #    self.n_pixels = dims_in[1] * dims_in[2]
+        #else:
+        self.n_pixels = 1
         self.activation = nn.Softplus(beta=0.5)
 
 

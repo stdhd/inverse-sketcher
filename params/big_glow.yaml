@@ -1,5 +1,5 @@
 batch_size: 16
-n_epochs: 400
+n_epochs: 100
 
 #Optimizer
 optimizer: Adam
@@ -25,6 +25,6 @@ model_params: {dim_cond: [1,256,256], conv_size_cond: 3,
                act_norm: False
 }
 
-model_name: "default"
+model_name: "big_glow"
 load_model: False
 architecture: "glow"
