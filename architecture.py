@@ -57,7 +57,7 @@ def baseline_aio():
 
     for k in range(8):
         nodes.append(Ff.Node(nodes[-1], AIOCONV,
-                             {'subnet_constructor': sub_conv(64, 3, 0),
+                             {'subnet_constructor': sub_conv(64, 3, 4),
                               'clamp': 1.0},
                              conditions=conditions[0],
                              name=F'block_{k}'))
@@ -71,7 +71,7 @@ def baseline_aio():
     for k in range(10):
         nodes.append(Ff.Node(nodes[-1], AIOCONV,
                              {
-                                 'subnet_constructor': sub_conv(128, 3, 0),
+                                 'subnet_constructor': sub_conv(128, 3, 4),
                                  'clamp': 0.9,
                              },
                              conditions=conditions[1],
@@ -91,7 +91,7 @@ def baseline_aio():
     for k in range(8):
         nodes.append(Ff.Node(nodes[-1], AIOCONV,
                              {
-                                 'subnet_constructor': sub_conv(256, 3 if k%2 else 1, 0),
+                                 'subnet_constructor': sub_conv(256, 3 if k%2 else 1, 4),
                                  'clamp': 1.0,
                              },
                              conditions=conditions[2],
@@ -112,7 +112,7 @@ def baseline_aio():
         nodes.append(Ff.Node(nodes[-1], AIOFC,
                              {
                                  'clamp': 0.6,
-                                 'subnet_constructor': sub_fc(512, 1)
+                                 'subnet_constructor': sub_fc(1024, 4)
                              },
                              conditions=conditions[3],
                              name=F'block_{k + 10}'))
@@ -143,7 +143,7 @@ def baseline():
 
     for k in range(4):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
-                             {'subnet_constructor': sub_conv(64, 3, 0),
+                             {'subnet_constructor': sub_conv(64, 3, 4),
                               'clamp': 1.0},
                              conditions=conditions[0],
                              name=F'block_{k}'))
@@ -157,7 +157,7 @@ def baseline():
     for k in range(6):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {
-                                 'subnet_constructor': sub_conv(128, 3, 0),
+                                 'subnet_constructor': sub_conv(128, 3, 4),
                                  'clamp': 1.0,
                              },
                              conditions=conditions[1],
@@ -177,7 +177,7 @@ def baseline():
     for k in range(6):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {
-                                 'subnet_constructor': sub_conv(256, 3 if k%2 else 1, 0),
+                                 'subnet_constructor': sub_conv(256, 3 if k%2 else 1, 4),
                                  'clamp': 1.0,
                              },
                              conditions=conditions[2],
@@ -198,7 +198,7 @@ def baseline():
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {
                                  'clamp': 0.6,
-                                 'subnet_constructor': sub_fc(512, 1)
+                                 'subnet_constructor': sub_fc(1024, 4)
                              },
                              conditions=conditions[3],
                              name=F'block_{k + 10}'))

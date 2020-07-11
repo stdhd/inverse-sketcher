@@ -78,8 +78,8 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
     else:
         train_split, test_split = split[0], split[1]
 
-    dataloader_train = DataLoader(train_split, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count(), drop_last=True)
-    dataloader_test = DataLoader(test_split, batch_size=batch_size, shuffle=False, num_workers=os.cpu_count())
+    dataloader_train = DataLoader(train_split, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+    dataloader_test = DataLoader(test_split, batch_size=batch_size, shuffle=False, num_workers=0)
 
     return dataloader_train, dataloader_test, train_split, test_split
 
