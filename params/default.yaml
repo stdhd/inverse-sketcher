@@ -21,6 +21,7 @@ model_params: {dim_cond: [1,256,256], conv_size_cond: 3,
                clamping_per_group:[1.0, 1.0, 1.0, 0.6],
                kernel_size_per_group:[3, 3, [3, 3, 3, 3, 3, 3]],
                hidden_layers_per_group:[0, 0, 0, 0],
+               fc_size: 512,
                act_norm: False
 }
 
