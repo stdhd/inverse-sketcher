@@ -70,7 +70,9 @@ def generate_from_testset(device, model_list):
             params["test_ratio"],
             only_classes=params.get("only_classes", None),
             split=split,
-            only_one_sample=params.get("only_one_sample", False))
+            only_one_sample=params.get("only_one_sample", False),
+            load_on_request=True
+        )
         model.to(device)
 
         try:
@@ -123,7 +125,8 @@ def sanity_check(device, model_list):
             params["test_ratio"],
             only_classes=params.get("only_classes", None),
             split=split,
-            only_one_sample=params.get("only_one_sample", False)
+            only_one_sample=params.get("only_one_sample", False),
+            load_on_request=True
         )
         model.to(device)
 
@@ -166,7 +169,7 @@ if __name__== "__main__":
         device = torch.device('cpu')
         print("CUDA disabled.")
 
-    model_list = ["default_0709_0", "default_0709_8"]
+    model_list = ["default_0709_4", "default_0709_5"]#"default_0709_4", "default_0709_5"]
 
     sanity_check(device, model_list)
     generate_from_testset(device, model_list)

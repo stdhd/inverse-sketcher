@@ -9,7 +9,7 @@ import numpy as np
 import data
 import argparse
 import math
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 import os
 import torchvision
 import yaml
@@ -57,7 +57,7 @@ def get_transform():
     return transforms.Resize((64, 64))
 
 
-def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None, only_one_sample=False):
+def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None, only_one_sample=False, load_on_request=False):
     """
     Create data loaders from ImageDataSet according parameters. If split is provided, it is used by the data loader.
     :param data_path: path of root directory of data set, while directories 'photo' and 'sketch' are sub directories
@@ -71,15 +71,14 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
         test_ratio = 0.5
         batch_size = 1
 
-    data_set = data.ImageDataSet(root_dir=data_path, transform=get_transform(), only_classes=only_classes, only_one_sample=only_one_sample)
+    data_set = data.ImageDataSet(root_dir=data_path, transform=get_transform(), only_classes=only_classes, only_one_sample=only_one_sample, load_on_request=load_on_request)
     if split is None:
-        train_split, test_split = torch.utils.data.random_split(data_set, [math.ceil(len(data_set) * (1-test_ratio)),
-                                                                           math.floor(len(data_set) * test_ratio)])
+        perm = torch.randperm(len(data_set))
+        train_split, test_split = perm[:math.ceil(len(data_set) * (1-test_ratio))], perm[math.ceil(len(data_set) * (1-test_ratio)):]
     else:
         train_split, test_split = split[0], split[1]
-
-    dataloader_train = DataLoader(train_split, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count(), drop_last=True)
-    dataloader_test = DataLoader(test_split, batch_size=batch_size, shuffle=False, num_workers=os.cpu_count())
+    dataloader_train = DataLoader(Subset(data_set, train_split), batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+    dataloader_test = DataLoader(Subset(data_set, test_split), batch_size=batch_size, shuffle=False, num_workers=0)
 
     return dataloader_train, dataloader_test, train_split, test_split
 
