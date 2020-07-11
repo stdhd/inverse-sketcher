@@ -247,7 +247,7 @@ if __name__ == "__main__":
             scheduler.step()
             #scheduler.step(validate(model, dataloader_test))
             np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}'.format(params["model_name"],  str(epoch))), loss_summary, fmt='%1.3f')
-            print("Epoch {} / {} Loss: {}".format(e + 1, params["n_epochs"], epoch_loss))
+            print("Epoch {} / {} Training Loss: {}, Validation Loss: {}".format(e + 1, params["n_epochs"], epoch_loss, validate()))
 
             if not args.nocheckpoints:
                 save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
