@@ -9,15 +9,17 @@ import numpy as np
 import data
 import argparse
 import math
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 import os
 import torchvision
 import yaml
-from architecture import get_model_by_name
+from architecture import get_model_by_params
 from datetime import date
 import pprint
 from torchvision import transforms
 from PIL import ImageFile
+import matplotlib.pyplot as plt
+import socket
 
 def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     """
@@ -48,6 +50,11 @@ def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
 
         os.mkdir(save_dir_mod)
         param["save_dir"] = save_dir_mod
+
+        # Copy yaml to training dir
+        with open(os.path.join (save_dir_mod, 'modelcopy.yaml'), 'w') as outfile:
+            yaml.dump(param, outfile, default_flow_style=True)
+
     else:
         raise RuntimeError("No folders can be created in read-only mode.")
 
@@ -57,7 +64,7 @@ def get_transform():
     return transforms.Resize((64, 64))
 
 
-def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None, only_one_sample=False):
+def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None, only_one_sample=False, load_on_request=False):
     """
     Create data loaders from ImageDataSet according parameters. If split is provided, it is used by the data loader.
     :param data_path: path of root directory of data set, while directories 'photo' and 'sketch' are sub directories
@@ -65,21 +72,22 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
     :param test_ratio: 0.1 means 10% test data
     :param split: optional train/test split
     :param only_classes: optional list of folder names to retrieve training data from
+    :param only_one_sample: Load only one sketch and one image
+    :param num_workers: number of workers threads for loading sketches and images from drive
     :return: train and test dataloaders and train and test split
     """
     if only_one_sample:
         test_ratio = 0.5
         batch_size = 1
 
-    data_set = data.ImageDataSet(root_dir=data_path, transform=get_transform(), only_classes=only_classes, only_one_sample=only_one_sample)
+    data_set = data.ImageDataSet(root_dir=data_path, transform=get_transform(), only_classes=only_classes, only_one_sample=only_one_sample, load_on_request=load_on_request)
     if split is None:
-        train_split, test_split = torch.utils.data.random_split(data_set, [math.ceil(len(data_set) * (1-test_ratio)),
-                                                                           math.floor(len(data_set) * test_ratio)])
+        perm = torch.randperm(len(data_set))
+        train_split, test_split = perm[:math.ceil(len(data_set) * (1-test_ratio))], perm[math.ceil(len(data_set) * (1-test_ratio)):]
     else:
         train_split, test_split = split[0], split[1]
-
-    dataloader_train = DataLoader(train_split, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
-    dataloader_test = DataLoader(test_split, batch_size=batch_size, shuffle=False, num_workers=0)
+    dataloader_train = DataLoader(Subset(data_set, train_split), batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+    dataloader_test = DataLoader(Subset(data_set, test_split), batch_size=batch_size, shuffle=False, num_workers=0)
 
     return dataloader_train, dataloader_test, train_split, test_split
 
@@ -94,7 +102,7 @@ def get_optimizer(param, trainables):
 
 
 def get_model(param):
-    return get_model_by_name(param["architecture"]).to(device)#cINN(**param.get("model_params")).to(device)
+    return get_model_by_params(param).to(device)#cINN(**param.get("model_params")).to(device)
 
 
 def load_state(param):
@@ -183,7 +191,7 @@ if __name__ == "__main__":
         print("CUDA disabled.")
 
     # Define dictionary of hyper parameters
-    list_hyper_params = ["default_aio.yaml"]
+    list_hyper_params = ["default.yaml"]
 
     # Loop over hyper parameter configurations
     pp = pprint.PrettyPrinter(indent=4)
@@ -220,6 +228,8 @@ if __name__ == "__main__":
             split = (train_split, test_split)
 
         t_start = time()
+        loss_summary = np.zeros(0)
+        print(socket.gethostname())
         print("Starting training for params:")
         pp.pprint(params)
         for e in range(params["n_epochs"]):
@@ -232,16 +242,27 @@ if __name__ == "__main__":
                 loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / gauss_output.shape[1]
                 loss.backward()
                 epoch_loss += loss.item()/len(dataloader_train)
+                loss_summary = np.append(loss_summary, loss.item())
                 optimizer.step()
             scheduler.step()
             #scheduler.step(validate(model, dataloader_test))
+            np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}'.format(params["model_name"],  str(epoch))), loss_summary, fmt='%1.3f')
             print("Epoch {} / {} Loss: {}".format(e + 1, params["n_epochs"], epoch_loss))
 
             if not args.nocheckpoints:
                 save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
+
+        np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}_FINAL'.format(params["model_name"], str(epoch))),
+                   loss_summary, fmt='%1.3f')
+        f = plt.figure()
+        plt.plot(loss_summary)
+        plt.xlabel('Batch')
+        plt.ylabel('Batch Loss')
+        plt.savefig(os.path.join(params["save_dir"], 'batchloss_{}.pdf'.format(params["model_name"]) ))
+        plt.close()
+
         if args.nocheckpoints:
-            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss,
-                       split)
+            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
             print("Model is saved to {}".format(params["save_dir"]))
 
         print('%.3i \t%.6f min' % (epoch, (time() - t_start) / 60.))

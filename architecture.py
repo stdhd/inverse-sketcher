@@ -9,13 +9,13 @@ from aiocoupling_fc import AIO_Block as AIOFC
 from aiocoupling_conv import AIO_Block as AIOCONV
 
 
-def get_model_by_name(name):
-    if name.lower() == "glow":
-        return baseline()
-    elif name.lower() == "aio":
-        return baseline_aio()
+def get_model_by_params(params):
+    if params['architecture'].lower() == "glow":
+        return baseline_glow(params['model_params'])
+    elif params['architecture'].lower() == "aio":
+        return baseline_aio(params['model_params'])
     else:
-        raise(ValueError("Model architecture {} is not defined".format(name)))
+        raise(ValueError("Model architecture is not defined"))
 
 def random_orthog(n):
     w = torch.randn(n, n)
@@ -34,17 +34,19 @@ def sub_conv(ch_hidden, kernel, num_hidden_layers=0):
         nn.Conv2d(ch_hidden, ch_out, kernel, padding=pad))
 
 
-def sub_fc(ch_hidden, num_hidden_layers=0):
+def sub_fc(ch_hidden, num_hidden_layers=0, dropout=0.0):
     return lambda ch_in, ch_out: nn.Sequential(
         nn.Linear(ch_in, ch_hidden),
         nn.ReLU(),
         *(nn.Linear(ch_hidden, ch_hidden),
         nn.ReLU()) * num_hidden_layers,
-        nn.Linear(ch_hidden, ch_out))
+        nn.Linear(ch_hidden, ch_out),
+        nn.Dropout(p=dropout)
+    )
 
 
-def baseline_aio():
-    cond = CondNet()
+def baseline_aio(m_params):
+    cond = CondNet(m_params)
 
     nodes = [Ff.InputNode(3, 64, 64)]
     # outputs of the cond. net at different resolution levels
@@ -57,13 +59,13 @@ def baseline_aio():
 
     for k in range(8):
         nodes.append(Ff.Node(nodes[-1], AIOCONV,
-                             {'subnet_constructor': sub_conv(64, 3, 4),
+                             {'subnet_constructor': sub_conv(64, 3, 2),
                               'clamp': 1.0},
                              conditions=conditions[0],
                              name=F'block_{k}'))
-        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
         #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(3)}))
-        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
     nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
@@ -71,14 +73,14 @@ def baseline_aio():
     for k in range(10):
         nodes.append(Ff.Node(nodes[-1], AIOCONV,
                              {
-                                 'subnet_constructor': sub_conv(128, 3, 4),
+                                 'subnet_constructor': sub_conv(128, 3, 2),
                                  'clamp': 0.9,
                              },
                              conditions=conditions[1],
                              name=F'block_{k + 2}'))
         nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
         #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(12)}))
-        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+       # nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
     # split off 8/12 ch
@@ -91,7 +93,7 @@ def baseline_aio():
     for k in range(8):
         nodes.append(Ff.Node(nodes[-1], AIOCONV,
                              {
-                                 'subnet_constructor': sub_conv(256, 3 if k%2 else 1, 4),
+                                 'subnet_constructor': sub_conv(256, 3 if k%2 else 1, 2),
                                  'clamp': 1.0,
                              },
                              conditions=conditions[2],
@@ -112,7 +114,7 @@ def baseline_aio():
         nodes.append(Ff.Node(nodes[-1], AIOFC,
                              {
                                  'clamp': 0.6,
-                                 'subnet_constructor': sub_fc(1024, 4)
+                                 'subnet_constructor': sub_fc(1024, 2)
                              },
                              conditions=conditions[3],
                              name=F'block_{k + 10}'))
@@ -129,8 +131,8 @@ def baseline_aio():
     return inn
 
 
-def baseline():
-    cond = CondNet()
+def baseline_glow(m_params):
+    cond = CondNet(m_params)
 
     nodes = [Ff.InputNode(3, 64, 64)]
     # outputs of the cond. net at different resolution levels
@@ -140,31 +142,39 @@ def baseline():
                   Ff.ConditionNode(512)]
 
     split_nodes = []
-
-    for k in range(4):
+    for k in range(m_params['blocks_per_group'][0]):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
-                             {'subnet_constructor': sub_conv(64, 3, 4),
-                              'clamp': 1.0},
+                             {'subnet_constructor': sub_conv(64, m_params['kernel_size_per_group'][0],
+                                                             m_params['hidden_layers_per_group'][0]),
+                              'clamp': m_params['clamping_per_group'][0]},
+                             },
                              conditions=conditions[0],
                              name=F'block_{k}'))
-        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
-        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(3)}))
-        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        if m_params['permute'] == 'random':
+            nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        elif m_params['permute'] == 'soft':
+            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(3)}))
+        if m_params['act_norm'] == True:
+            nodes.append(Ff.Node(nodes[-1], LearnedActNorm, {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
     nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
 
-    for k in range(6):
+    for k in range(m_params['blocks_per_group'][1]):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
-                             {
-                                 'subnet_constructor': sub_conv(128, 3, 4),
-                                 'clamp': 1.0,
+                              {
+                                 'subnet_constructor': sub_conv(128, m_params['kernel_size_per_group'][1],
+                                                                m_params['hidden_layers_per_group'][1]),
+                                 'clamp': m_params['clamping_per_group'][1],
                              },
                              conditions=conditions[1],
                              name=F'block_{k + 2}'))
-        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
-        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(12)}))
-        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        if m_params['permute'] == 'random':
+            nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        elif m_params['permute'] == 'soft':
+            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(12)}))
+        if m_params['act_norm'] == True:
+            nodes.append(Ff.Node(nodes[-1], LearnedActNorm, {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
     # split off 8/12 ch
@@ -174,17 +184,21 @@ def baseline():
 
     nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
 
-    for k in range(6):
+    for k in range(m_params['blocks_per_group'][2]):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {
-                                 'subnet_constructor': sub_conv(256, 3 if k%2 else 1, 4),
-                                 'clamp': 1.0,
+                                 'subnet_constructor': sub_conv(256, m_params['kernel_size_per_group'][2][k],
+                                                                m_params['hidden_layers_per_group'][2]),
+                                 'clamp': m_params['clamping_per_group'][2],
                              },
                              conditions=conditions[2],
                              name=F'block_{k + 6}'))
-        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
-        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
-        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        if m_params['permute'] == 'random':
+            nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        elif m_params['permute'] == 'soft':
+            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
+        if m_params['act_norm'] == True:
+            nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
 
 
     # split off 8/16 ch
@@ -194,16 +208,16 @@ def baseline():
     nodes.append(Ff.Node(nodes[-1], Fm.Flatten, {}, name='flatten'))
 
     # fully_connected part
-    for k in range(4):
+    for k in range(m_params['blocks_per_group'][3]):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {
-                                 'clamp': 0.6,
-                                 'subnet_constructor': sub_fc(1024, 4)
+                                 'clamp': m_params['clamping_per_group'][3],
+                                 'subnet_constructor': sub_fc(m_params['fc_size'], m_params['hidden_layers_per_group'][3], dropout=m_params['dropout_fc'])
                              },
                              conditions=conditions[3],
                              name=F'block_{k + 10}'))
 
-        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
         #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
     # concat everything
     nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
@@ -216,7 +230,7 @@ def baseline():
 class CondNet(nn.Module):
     '''conditioning network'''
 
-    def __init__(self):
+    def __init__(self, params):
         super().__init__()
 
         self.blocks = nn.ModuleList([nn.Sequential(nn.Conv2d(1, 64, 3, padding=1),
@@ -234,7 +248,10 @@ class CondNet(nn.Module):
                                      nn.Sequential(nn.LeakyReLU(),
                                                    nn.AvgPool2d(4),
                                                    Flatten(),
-                                                   nn.Linear(2048, 512))])
+                                                   nn.Dropout(params.get("cond_dropout", 0.0)),
+                                                   nn.Linear(2048, 1024))
+                                     ]
+                                    )
 
     def forward(self, c):
         outputs = [c]
