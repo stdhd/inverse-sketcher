@@ -7,6 +7,7 @@ import torch
 from PIL import Image
 import torchvision
 from tqdm import tqdm
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -76,14 +77,25 @@ class ImageDataSet(Dataset):
                 if os.path.isdir(os.path.join(self.__sketch_dir, classfolder.name)) and (self.only_classes==None or classfolder.name in self.only_classes):
                     with os.scandir(os.path.join(self.__sketch_dir, classfolder.name)) as sketch_iterator:
                         for file in sketch_iterator:
-                            if not file.name.startswith("."):
+                            if not file.name.startswith(".") and not file.name.endswith(".svg"):
                                 path_sketch = os.path.join(self.__sketch_dir, classfolder.name, file.name)
-                                path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("-")[0] + ".jpg")
+                                if "SketchyDatabase" in path_sketch:
+                                    path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("-")[0] + ".jpg")
+                                elif "ShoeV2_F" in path_sketch:
+                                    path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("_")[0] + ".png")
+                                else:
+                                    raise(RuntimeError("Unknown dataset {}".format(self.__sketch_dir.split("/")[1])))
                                 if not os.path.exists(path_real):
                                     logger.error("Warning: Could not find real image named {} corresponding to sketch {}".format(path_real, path_sketch))
                                     continue
                                 if not self.load_on_request:
-                                    image, sketch = Image.open(path_real), Image.open(path_sketch).convert("L")
+                                    image, sketch = Image.open(path_real), Image.open(path_sketch)
+                                    if np.asarray(sketch).shape[-1] == 4:
+                                        sketch = torchvision.transforms.ToPILImage()(torch.from_numpy(np.asarray(sketch)[:,:,-1]))
+                                        sub = False
+                                    else:
+                                        sketch = sketch.convert("L")
+                                        sub = True
                                     if not self.__transform is None:
                                         sketch = self.__transform(sketch)
                                         image = self.__transform(image)
@@ -91,7 +103,8 @@ class ImageDataSet(Dataset):
                                     sketch = tensor_transform(sketch)
 
                                     #Make the background pixels black and brushstroke pixels white
-                                    sketch = (1 - sketch)
+                                    if sub:
+                                        sketch = (1 - sketch)
                                     image += self.noise_factor * torch.rand_like(image)
                                     sketch += self.noise_factor * torch.rand_like(sketch)
                                     self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name], image, sketch))
@@ -141,7 +154,14 @@ class ImageDataSet(Dataset):
             if path_sketch.endswith(' (1).png'):
                 path_sketch = path_sketch.split(" ")[0] + ".png"
 
-            sketch = Image.open(path_sketch).convert("L")
+            sketch = Image.open(path_sketch)
+            if np.asarray(sketch).shape[-1] == 4:
+                sketch = torchvision.transforms.ToPILImage()(torch.from_numpy(np.asarray(sketch)[:,:,-1]))
+                sub = False
+            else:
+                sketch = sketch.convert("L")
+                sub = True
+
             image = Image.open(path_real)
 
             if not self.__transform is None:
@@ -153,7 +173,8 @@ class ImageDataSet(Dataset):
             sketch = tensor_transform(sketch)
 
             #Make the background pixels black and brushstroke pixels white
-            sketch = (1 - sketch)
+            if sub:
+                sketch = (1 - sketch)
 
             # Add noise
             image += self.noise_factor * torch.rand_like(image)

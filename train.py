@@ -159,7 +159,8 @@ def save_state(param, model_state, optim_state, scheduler_state, epoch, running_
         'only_classes': param.get('only_classes', None),
         'only_one_sample': param.get('only_one_sample', False),
         'scheduler_state_dict': scheduler_state,
-        'architecture': param.get("architecture")
+        'architecture': param.get("architecture"),
+        'data_path': param.get("data_path")
     }, f"{path}.tar")
 
 def validate(model, dataloader_test):
@@ -168,6 +169,8 @@ def validate(model, dataloader_test):
         val_loss = 0
         for batch, (sketch, real, label) in enumerate(tqdm(dataloader_test)):
             sketch, real, label = sketch.to(device), real.to(device), label.to(device)
+            if params.get("half_precision", False):
+                sketch, real = sketch.half(), real.half()
             gauss_output = model(real, sketch)
             loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / gauss_output.shape[1]
             val_loss += loss/len(dataloader_test)
@@ -212,12 +215,13 @@ if __name__ == "__main__":
             print("No checkpoint mode active. No checkpoint is created after every batch. Model will be saved to {} at the end of trainig.".format(params["save_dir"]))
         if params['only_one_sample']:
             print("!!!!!!!!!!!!!!!! ONLY ONE SAMPLE MODE IS ACITVE !!!!!!!!!!!!!!!!")
+        if not params.get("data_path", False):
+            params["data_path"] = "dataset/SketchyDatabase/256x256"
 
         if params.get("load_model", False):
             # Load training progress from existing split
             model, optimizer, epoch, split, scheduler = load_state(params)
-            dataloader_train, dataloader_test, train_split, test_split = create_dataloaders("dataset/SketchyDatabase"
-                                                                                            "/256x256",
+            dataloader_train, dataloader_test, train_split, test_split = create_dataloaders(params["data_path"],
                                                                                             params["batch_size"],
                                                                                             params["test_ratio"],
                                                                                             split=split,
@@ -229,15 +233,15 @@ if __name__ == "__main__":
             model = get_model(params)
             scheduler, optimizer = get_optimizer(params, model.parameters())
             epoch = 0
-            dataloader_train, dataloader_test, train_split, test_split = create_dataloaders("dataset/SketchyDatabase"
-                                                                                            "/256x256",
+            dataloader_train, dataloader_test, train_split, test_split = create_dataloaders(params["data_path"],
                                                                                             params["batch_size"],
                                                                                             params["test_ratio"],
                                                                                             only_classes=params.get('only_classes', None),
                                                                                             only_one_sample=params.get('only_one_sample', False),
                                                                                             load_on_request=args.nopreload)
             split = (train_split, test_split)
-
+        if params.get("half_precision", False):
+            model.half()
         t_start = time()
         loss_summary = np.zeros(0)
         print(socket.gethostname())
@@ -249,13 +253,14 @@ if __name__ == "__main__":
             for batch, (sketch, real, label) in enumerate(tqdm(dataloader_train)):
                 optimizer.zero_grad()
                 sketch, real, label = sketch.to(device), real.to(device), label.to(device)
+                if params.get("half_precision", False):
+                    sketch, real = sketch.half(), real.half()
                 gauss_output = model(real, sketch)
                 loss = torch.mean(gauss_output**2/2) - torch.mean(model.log_jacobian()) / gauss_output.shape[1]
                 loss.backward()
                 epoch_loss += loss.item()/len(dataloader_train)
                 loss_summary = np.append(loss_summary, loss.item())
                 optimizer.step()
-                break
             scheduler.step()
             #scheduler.step(validate(model, dataloader_test))
             np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}'.format(params["model_name"],  str(epoch))), loss_summary, fmt='%1.3f')
