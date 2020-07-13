@@ -62,6 +62,8 @@ def generate_from_testset(device, model_list):
         if not params.get("data_path", False):
             params["data_path"] = "dataset/SketchyDatabase/256x256"
 
+
+
         __, dataloader_test, ___, test_split = train.create_dataloaders(
             params["data_path"],
             params["batch_size"],
