@@ -7,6 +7,7 @@ import torch
 from PIL import Image
 import torchvision
 from tqdm import tqdm
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ class ImageMetaData(object):
 
 class ImageDataSet(Dataset):
 
-    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.005, load_on_request=False):
+    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.002, load_on_request=False):
         """
         root_dir: directory of the dataset
         include_unk: Whether to include the unknown class
@@ -88,7 +89,13 @@ class ImageDataSet(Dataset):
                                     logger.error("Warning: Could not find real image named {} corresponding to sketch {}".format(path_real, path_sketch))
                                     continue
                                 if not self.load_on_request:
-                                    image, sketch = Image.open(path_real), Image.open(path_sketch).convert("L")
+                                    image, sketch = Image.open(path_real), Image.open(path_sketch)
+                                    if np.asarray(sketch).shape[-1] == 4:
+                                        sketch = torchvision.transforms.ToPILImage()(torch.from_numpy(np.asarray(sketch)[:,:,-1]))
+                                        sub = False
+                                    else:
+                                        sketch = sketch.convert("L")
+                                        sub = True
                                     if not self.__transform is None:
                                         sketch = self.__transform(sketch)
                                         image = self.__transform(image)
@@ -96,7 +103,8 @@ class ImageDataSet(Dataset):
                                     sketch = tensor_transform(sketch)
 
                                     #Make the background pixels black and brushstroke pixels white
-                                    sketch = (1 - sketch)
+                                    if sub:
+                                        sketch = (1 - sketch)
                                     image += self.noise_factor * torch.rand_like(image)
                                     sketch += self.noise_factor * torch.rand_like(sketch)
                                     self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name], image, sketch))
@@ -146,7 +154,14 @@ class ImageDataSet(Dataset):
             if path_sketch.endswith(' (1).png'):
                 path_sketch = path_sketch.split(" ")[0] + ".png"
 
-            sketch = Image.open(path_sketch).convert("L")
+            sketch = Image.open(path_sketch)
+            if np.asarray(sketch).shape[-1] == 4:
+                sketch = torchvision.transforms.ToPILImage()(torch.from_numpy(np.asarray(sketch)[:,:,-1]))
+                sub = False
+            else:
+                sketch = sketch.convert("L")
+                sub = True
+
             image = Image.open(path_real)
 
             if not self.__transform is None:
@@ -158,7 +173,8 @@ class ImageDataSet(Dataset):
             sketch = tensor_transform(sketch)
 
             #Make the background pixels black and brushstroke pixels white
-            sketch = (1 - sketch)
+            if sub:
+                sketch = (1 - sketch)
 
             # Add noise
             image += self.noise_factor * torch.rand_like(image)

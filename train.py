@@ -159,7 +159,8 @@ def save_state(param, model_state, optim_state, scheduler_state, epoch, running_
         'only_classes': param.get('only_classes', None),
         'only_one_sample': param.get('only_one_sample', False),
         'scheduler_state_dict': scheduler_state,
-        'architecture': param.get("architecture")
+        'architecture': param.get("architecture"),
+        'data_path': param.get("data_path")
     }, f"{path}.tar")
 
 def validate(model, dataloader_test):

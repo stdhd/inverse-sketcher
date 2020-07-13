@@ -12,12 +12,13 @@ import scipy.stats
 from tqdm import tqdm
 
 
-def load_trained_model(file):
+def load_trained_model(folder):
     """
     Provide model and test split from given parameter dictionary in file
     :param file: path to file
     :return: model, split, params
     """
+    file = os.path.join(folder, [f for f in os.listdir(folder) if ".tar" in f ][0])
 
     try:
         state_dicts = torch.load(file, map_location=torch.device('cpu'))
@@ -57,10 +58,10 @@ def latent_gauss(model_name, data, path, bins=50):
 def generate_from_testset(device, model_list):
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
+        model, split, params = load_trained_model(os.path.join("saved_models", model_name))
         if not params.get("data_path", False):
             params["data_path"] = "dataset/SketchyDatabase/256x256"
 
-        model, split, params = load_trained_model(os.path.join("saved_models", model_name, "default.tar"))
         __, dataloader_test, ___, test_split = train.create_dataloaders(
             params["data_path"],
             params["batch_size"],
@@ -86,26 +87,26 @@ def generate_from_testset(device, model_list):
                     device)
                 batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
                 subset = 0
-                fig, axes = plt.subplots(nrows=3, ncols=2)
                 for i in range(batch_inputs.shape[0]):
-
+                    if i % 3 == 0:
+                        fig, axes = plt.subplots(nrows=3, ncols=3)
                     condition_image = transforms.ToPILImage()(batch_conditions[i].cpu().detach()).convert('L')
                     generated_image = transforms.ToPILImage()(batch_output[i].cpu().detach()).convert("RGB")
+                    original = transforms.ToPILImage()(batch_inputs[i].cpu().detach()).convert("RGB")
                     axes[i % 3, 0].imshow(condition_image, cmap='gray')
-
                     axes[i % 3, 1].imshow(generated_image)
+                    axes[i % 3, 2].imshow(original)
 
                     axes[i % 3, 0].axis('off')
                     axes[i % 3, 1].axis('off')
+                    axes[i % 3, 2].axis('off')
+
 
                     if i % 3 == 0 or i == batch_inputs.shape[0] - 1:
                         plt.savefig(
                             os.path.join("generator", model_name, "out_batch{}_{}.pdf".format(batch_no, subset)),
                             bbox_inches='tight')
                         subset += 1
-                        plt.close(fig)
-                        fig, axes = plt.subplots(nrows=3, ncols=2)
-                    if i == batch_inputs.shape[0]:
                         plt.close(fig)
                 if batch_no > 10:
                     break
@@ -114,7 +115,7 @@ def generate_from_testset(device, model_list):
 def sanity_check(device, model_list):
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
-        model, split, params = load_trained_model(os.path.join("saved_models", model_name, "default.tar"))
+        model, split, params = load_trained_model(os.path.join("saved_models", model_name))
         if not params.get("data_path", False):
             params["data_path"] = "dataset/SketchyDatabase/256x256"
 
