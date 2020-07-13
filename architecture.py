@@ -32,7 +32,7 @@ def sub_conv(ch_hidden, kernel, num_hidden_layers=0):
         *(nn.Conv2d(ch_hidden, ch_hidden, kernel, padding=pad),
         nn.LeakyReLU()) * num_hidden_layers,
         nn.Conv2d(ch_hidden, ch_out, kernel, padding=pad),
-        nn.BatchNorm2d(2*c_out)
+        nn.BatchNorm2d(ch_out)
 )
 
 
@@ -254,7 +254,7 @@ class CondNet(nn.Module):
 
                                      nn.Sequential(nn.LeakyReLU(),
                                                    nn.AvgPool2d(4),
-                                                   nn.BatchNorm2d(512)
+                                                   nn.BatchNorm2d(128),
                                                    Flatten(),
                                                    nn.Dropout(params.get("cond_dropout", 0.0)),
                                                    nn.Linear(2048, 512))
