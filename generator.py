@@ -59,6 +59,7 @@ def generate_from_testset(device, model_list):
         print('Generate from model {}'.format(model_name))
 
         model, split, params = load_trained_model(os.path.join("saved_models", model_name, "default.tar"))
+
         __, dataloader_test, ___, test_split = train.create_dataloaders(
             "dataset/SketchyDatabase"
             "/256x256",

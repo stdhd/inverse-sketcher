@@ -153,8 +153,10 @@ def baseline_glow(m_params):
             nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
         elif m_params['permute'] == 'soft':
             nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(3)}))
-        if m_params['act_norm'] == True:
+        if m_params['act_norm'] == 'learnednorm':
             nodes.append(Ff.Node(nodes[-1], LearnedActNorm, {'M': torch.randn(1), "b": torch.randn(1)}))
+        elif m_params['act_norm'] == 'movingavg':
+            nodes.append(Ff.Node(nodes[-1], Fm.ActNorm, {}))
 
 
     nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
@@ -172,8 +174,10 @@ def baseline_glow(m_params):
             nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
         elif m_params['permute'] == 'soft':
             nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(12)}))
-        if m_params['act_norm'] == True:
+        if m_params['act_norm'] == 'learnednorm':
             nodes.append(Ff.Node(nodes[-1], LearnedActNorm, {'M': torch.randn(1), "b": torch.randn(1)}))
+        elif m_params['act_norm'] == 'movingavg':
+            nodes.append(Ff.Node(nodes[-1], Fm.ActNorm, {}))
 
 
     # split off 8/12 ch
@@ -196,8 +200,10 @@ def baseline_glow(m_params):
             nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
         elif m_params['permute'] == 'soft':
             nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
-        if m_params['act_norm'] == True:
+        if m_params['act_norm'] == 'learnednorm':
             nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        elif m_params['act_norm'] == 'movingavg':
+            nodes.append(Ff.Node(nodes[-1], Fm.ActNorm, {}))
 
 
     # split off 8/16 ch
@@ -365,8 +371,6 @@ class LearnedActNorm(nn.Module):
         #else:
         self.n_pixels = 1
         self.activation = nn.Softplus(beta=0.5)
-
-
 
     def forward(self, x, rev=False):
         if not rev:
