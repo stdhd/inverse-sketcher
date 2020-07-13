@@ -28,18 +28,20 @@ def sub_conv(ch_hidden, kernel, num_hidden_layers=0):
     pad = kernel // 2
     return lambda ch_in, ch_out: nn.Sequential(
         nn.Conv2d(ch_in, ch_hidden, kernel, padding=pad),
-        nn.ReLU(),
+        nn.LeakyReLU(),
         *(nn.Conv2d(ch_hidden, ch_hidden, kernel, padding=pad),
-        nn.ReLU()) * num_hidden_layers,
-        nn.Conv2d(ch_hidden, ch_out, kernel, padding=pad))
+        nn.LeakyReLU()) * num_hidden_layers,
+        nn.Conv2d(ch_hidden, ch_out, kernel, padding=pad),
+        nn.BatchNorm2d(2*c_out)
+)
 
 
 def sub_fc(ch_hidden, num_hidden_layers=0, dropout=0.0):
     return lambda ch_in, ch_out: nn.Sequential(
         nn.Linear(ch_in, ch_hidden),
-        nn.ReLU(),
+        nn.LeakyReLU(),
         *(nn.Linear(ch_hidden, ch_hidden),
-        nn.ReLU()) * num_hidden_layers,
+        nn.LeakyReLU()) * num_hidden_layers,
         nn.Linear(ch_hidden, ch_out),
         nn.Dropout(p=dropout)
     )
@@ -246,6 +248,7 @@ class CondNet(nn.Module):
 
                                      nn.Sequential(nn.LeakyReLU(),
                                                    nn.AvgPool2d(4),
+                                                   nn.BatchNorm2d(512)
                                                    Flatten(),
                                                    nn.Dropout(params.get("cond_dropout", 0.0)),
                                                    nn.Linear(2048, 512))
