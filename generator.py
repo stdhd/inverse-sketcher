@@ -62,7 +62,7 @@ def generate_from_testset(device, model_list):
         if not params.get("data_path", False):
             params["data_path"] = "dataset/SketchyDatabase/256x256"
 
-        model, split, params = load_trained_model(os.path.join("saved_models", model_name, "default.tar"))
+
 
         __, dataloader_test, ___, test_split = train.create_dataloaders(
             params["data_path"],
