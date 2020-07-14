@@ -24,26 +24,37 @@ def random_orthog(n):
     return w
 
 
-def sub_conv(ch_hidden, kernel, num_hidden_layers=0):
+def sub_conv(ch_hidden, kernel, num_hidden_layers=0, num_classes=0):
     pad = kernel // 2
+    if num_classes < 2:
+        bn = lambda ch_out: nn.BatchNorm2d(ch_out)
+    else:
+        bn = lambda ch_out: ConditionalBatchNorm2d(ch_out, num_classes)
+
     return lambda ch_in, ch_out: nn.Sequential(
         nn.Conv2d(ch_in, ch_hidden, kernel, padding=pad),
         nn.LeakyReLU(),
         *(nn.Conv2d(ch_hidden, ch_hidden, kernel, padding=pad),
         nn.LeakyReLU()) * num_hidden_layers,
         nn.Conv2d(ch_hidden, ch_out, kernel, padding=pad),
-        nn.BatchNorm2d(ch_out)
-)
+        bn(ch_out)
+        )
 
 
-def sub_fc(ch_hidden, num_hidden_layers=0, dropout=0.0):
+def sub_fc(ch_hidden, num_hidden_layers=0, dropout=0.0, num_classes=0):
+    if num_classes < 2:
+        bn = lambda ch_out: nn.BatchNorm1d(ch_out)
+    else:
+        bn = lambda ch_out: ConditionalBatchNorm1d(ch_out, num_classes)
+
     return lambda ch_in, ch_out: nn.Sequential(
         nn.Linear(ch_in, ch_hidden),
         nn.LeakyReLU(),
         *(nn.Linear(ch_hidden, ch_hidden),
         nn.LeakyReLU()) * num_hidden_layers,
         nn.Linear(ch_hidden, ch_out),
-        nn.Dropout(p=dropout)
+        nn.Dropout(p=dropout),
+        bn(ch_out)
     )
 
 
@@ -57,7 +68,7 @@ def baseline_aio(m_params):
                   Ff.ConditionNode(128, 16, 16),
                   Ff.ConditionNode(512)]
 
-    split_nodes = []
+    #split_nodes = []
 
     for k in range(8):
         nodes.append(Ff.Node(nodes[-1], AIOCONV,
@@ -86,9 +97,9 @@ def baseline_aio(m_params):
 
 
     # split off 8/12 ch
-    nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
-                         {'split_size_or_sections': [4, 8], 'dim': 0}))
-    split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
+    #nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
+    #                     {'split_size_or_sections': [4, 8], 'dim': 0}))
+    #split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
 
     nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
 
@@ -106,9 +117,9 @@ def baseline_aio(m_params):
 
 
     # split off 8/16 ch
-    nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
-                         {'split_size_or_sections': [8, 8], 'dim': 0}))
-    split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
+    #nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
+    #                     {'split_size_or_sections': [8, 8], 'dim': 0}))
+    #split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
     nodes.append(Ff.Node(nodes[-1], Fm.Flatten, {}, name='flatten'))
 
     # fully_connected part
@@ -125,8 +136,8 @@ def baseline_aio(m_params):
         #nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
         #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
     # concat everything
-    nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
-                         Fm.Concat1d, {'dim': 0}))
+    #nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
+    #                     Fm.Concat1d, {'dim': 0}))
     nodes.append(Ff.OutputNode(nodes[-1]))
     inn = SketchINN(cond)
     inn.build_inn(nodes, split_nodes, conditions)
@@ -183,9 +194,10 @@ def baseline_glow(m_params):
 
 
     # split off 8/12 ch
-    nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
-                         {'split_size_or_sections': [4, 8], 'dim': 0}))
-    split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
+    if m_params.get("split", True):
+        nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
+                             {'split_size_or_sections': [4, 8], 'dim': 0}))
+        split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
 
     nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
 
@@ -201,7 +213,7 @@ def baseline_glow(m_params):
         if m_params['permute'] == 'random':
             nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
         elif m_params['permute'] == 'soft':
-            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
+            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16 if m_params.get("split", True) else 48)}))
         if m_params['act_norm'] == 'learnednorm':
             nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
         elif m_params['act_norm'] == 'movingavg':
@@ -209,9 +221,10 @@ def baseline_glow(m_params):
 
 
     # split off 8/16 ch
-    nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
-                         {'split_size_or_sections': [8, 8], 'dim': 0}))
-    split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
+    if m_params.get("split", True):
+        nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
+                             {'split_size_or_sections': [8, 8], 'dim': 0}))
+        split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
     nodes.append(Ff.Node(nodes[-1], Fm.Flatten, {}, name='flatten'))
 
     # fully_connected part
@@ -227,7 +240,8 @@ def baseline_glow(m_params):
         #nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
         #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
     # concat everything
-    nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
+    if m_params.get("split", True):
+        nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
                          Fm.Concat1d, {'dim': 0}))
     nodes.append(Ff.OutputNode(nodes[-1]))
     inn = SketchINN(cond)
@@ -386,3 +400,34 @@ class LearnedActNorm(nn.Module):
 
     def output_dims(self, input_dims):
         return input_dims
+
+#taken from https://github.com/pytorch/pytorch/issues/8985#issuecomment-405080775
+class ConditionalBatchNorm2d(nn.Module):
+    def __init__(self, num_features, num_classes):
+        super().__init__()
+        self.num_features = num_features
+        self.bn = nn.BatchNorm2d(num_features, affine=False)
+        self.embed = nn.Embedding(num_classes, num_features * 2)
+        self.embed.weight.data[:, :num_features].normal_(1, 0.02)  # Initialise scale at N(1, 0.02)
+        self.embed.weight.data[:, num_features:].zero_()  # Initialise bias at 0
+
+    def forward(self, x, y):
+        out = self.bn(x)
+        gamma, beta = self.embed(y).chunk(2, 1)
+        out = gamma.view(-1, self.num_features, 1, 1) * out + beta.view(-1, self.num_features, 1, 1)
+        return out
+
+class ConditionalBatchNorm1d(nn.Module):
+    def __init__(self, num_features, num_classes):
+        super().__init__()
+        self.num_features = num_features
+        self.bn = nn.BatchNorm2d(num_features, affine=False)
+        self.embed = nn.Embedding(num_classes, num_features * 2)
+        self.embed.weight.data[:, :num_features].normal_(1, 0.02)  # Initialise scale at N(1, 0.02)
+        self.embed.weight.data[:, num_features:].zero_()  # Initialise bias at 0
+
+    def forward(self, x, y):
+        out = self.bn(x)
+        gamma, beta = self.embed(y).chunk(2, 1)
+        out = gamma.view(-1, self.num_features) * out + beta.view(-1, self.num_features)
+        return out
