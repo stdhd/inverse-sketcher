@@ -89,9 +89,9 @@ def generate_from_testset(device, model_list):
                     device)
                 batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
                 subset = 0
+                fig, axes = plt.subplots(nrows=3, ncols=3)
                 for i in range(batch_inputs.shape[0]):
-                    if i % 3 == 0:
-                        fig, axes = plt.subplots(nrows=3, ncols=3)
+
                     condition_image = transforms.ToPILImage()(batch_conditions[i].cpu().detach()).convert('L')
                     generated_image = transforms.ToPILImage()(batch_output[i].cpu().detach()).convert("RGB")
                     original = transforms.ToPILImage()(batch_inputs[i].cpu().detach()).convert("RGB")
@@ -104,12 +104,14 @@ def generate_from_testset(device, model_list):
                     axes[i % 3, 2].axis('off')
 
 
-                    if i % 3 == 0 or i == batch_inputs.shape[0] - 1:
+                    if i % 3 == 2 or i == batch_inputs.shape[0] - 1:
                         plt.savefig(
                             os.path.join("generator", model_name, "out_batch{}_{}.pdf".format(batch_no, subset)),
                             bbox_inches='tight')
                         subset += 1
                         plt.close(fig)
+                    if i % 3 == 2:
+                        fig, axes = plt.subplots(nrows=3, ncols=3)
                 if batch_no > 10:
                     break
 
