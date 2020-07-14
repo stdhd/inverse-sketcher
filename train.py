@@ -20,6 +20,7 @@ from torchvision import transforms
 from PIL import ImageFile
 import matplotlib.pyplot as plt
 import socket
+from autoencoder import AutoEncoder
 
 def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     """
@@ -177,6 +178,21 @@ def validate(model, dataloader_test):
     model.train()
     return val_loss
 
+def train_ae(encoder_sizes, decoder_sizes, train_loader, num_epochs=50):
+    AE = AutoEncoder(encoder_sizes, decoder_sizes).to(device)
+    optimizer = torch.optim.Adam(AE.parameters(), lr=0.0005, weight_decay=3e-6)
+    for epoch in tqdm(range(num_epochs), "Encoder pretraining"):
+        epoch_loss = 0
+        for batch, (sketch, real, label) in enumerate(tqdm(dataloader_train, "Batch")):
+            optimizer.zero_grad()
+            sketch, real, label = sketch.to(device), real.to(device), label.to(device)
+            recon = AE(sketch)
+            loss = torch.mean((sketch - recon) ** 2)
+            loss.backward()
+            epoch_loss += loss.item()/len(dataloader_train)
+            optimizer.step()
+        print("AutoEncoder pretraining: Epoch {} Loss: {}".format(epoch, epoch_loss))
+    return AE.encoder
 
 if __name__ == "__main__":
     # Determine, whether cuda will be enabled
@@ -247,6 +263,8 @@ if __name__ == "__main__":
         print(socket.gethostname())
         print("Starting training for params:")
         pp.pprint(params)
+        if params["model_params"].get("pretrain_cond", False) and not params.get("load_model", False):
+            model.cond_net = train_ae(params["model_params"]["encoder_sizes"], params["model_params"]["decoder_sizes"], dataloader_train)
         for e in range(params["n_epochs"]):
             epoch += 1
             epoch_loss = 0
