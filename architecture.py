@@ -7,15 +7,19 @@ import FrEIA.modules as Fm
 
 from aiocoupling_fc import AIO_Block as AIOFC
 from aiocoupling_conv import AIO_Block as AIOCONV
+from autoencoder import AutoEncoder
 
 
 def get_model_by_params(params):
     if params['architecture'].lower() == "glow":
-        return baseline_glow(params['model_params'])
+        model =  baseline_glow(params['model_params'])
     elif params['architecture'].lower() == "aio":
-        return baseline_aio(params['model_params'])
+        model = baseline_aio(params['model_params'])
     else:
         raise(ValueError("Model architecture is not defined"))
+    if params["model_params"].get("pretrain_cond", False):
+        model.cond_net = AutoEncoder(params["model_params"]["encoder_sizes"], params["model_params"]["decoder_sizes"]).encoder
+    return model
 
 def random_orthog(n):
     w = torch.randn(n, n)

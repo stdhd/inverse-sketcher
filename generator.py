@@ -23,8 +23,8 @@ def load_trained_model(folder):
 
     try:
         state_dicts = torch.load(file, map_location=torch.device('cpu'))
-    except:
-        raise (RuntimeError("Could not load training result from file " + file + "."))
+    except Exception as e:
+        raise (RuntimeError("Could not load training result from file " + file + ".\n" + str(e) ))
 
     if not "architecture" in state_dicts:
         state_dicts["architecture"] = 'glow'
