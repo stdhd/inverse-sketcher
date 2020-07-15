@@ -10,6 +10,7 @@ from architecture import get_model_by_params
 import numpy as np
 import scipy.stats
 from tqdm import tqdm
+import hiddenlayer as hl
 
 
 def load_trained_model(folder):
@@ -35,6 +36,10 @@ def load_trained_model(folder):
     split = (state_dicts["train_split"], state_dicts["test_split"])
     return mod, split, state_dicts
 
+def visualize_graph(model_list):
+    for model_name in model_list:
+        model, split, params = load_trained_model(os.path.join("saved_models", model_name))
+        hl.build_graph(model, torch.zeros([1, 3, 64, 64]), torch.zeros([1, 1, 64, 64]))
 
 def latent_gauss(model_name, data, path, bins=50):
     plt.figure(figsize=[10., 5.])
@@ -169,8 +174,13 @@ if __name__ == "__main__":
     parser.add_argument('--nocuda', help='Disable CUDA', action='store_true')
     parser.add_argument('--onlygenerate', help='Only generate, no sanity check', action='store_true')
     parser.add_argument('--onlysanity', help='Only sanity check, no generation', action='store_true')
+    parser.add_argument('--makegraph', help='Draw graph', action='store_true')
     args = parser.parse_args()
     device = None
+
+    if args.makegraph:
+        visualize_graph(args.modelnames)
+
     if not args.nocuda and torch.cuda.is_available():
         device = torch.device('cuda')
         print("CUDA enabled.")
