@@ -150,6 +150,11 @@ def baseline_aio(m_params):
 
 
 def baseline_glow(m_params):
+    if not m_params['permute'] in ['soft', 'random', 'none', 'false', None, False]:
+        raise (RuntimeError("Erros in model params: No 'permute'' selected or not understood."))
+    if not m_params['act_norm'] in ['learnednorm', 'movingavg', 'none', 'false', None, False]:
+        raise (RuntimeError("Erros in model params: No 'act_norm' selected or not understood."))
+
     cond = CondNet(m_params)
 
     nodes = [Ff.InputNode(3, 64, 64)]
