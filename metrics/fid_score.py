@@ -1,3 +1,4 @@
+# TODO: Taken from https://github.com/mseitzer/pytorch-fid, add correct credits
 #!/usr/bin/env python3
 """Calculates the Frechet Inception Distance (FID) to evalulate GANs
 
@@ -49,7 +50,7 @@ except ImportError:
     # If not tqdm is not available, provide a mock version of it
     def tqdm(x): return x
 
-from inception import InceptionV3
+from metrics.inception import InceptionV3
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('path', type=str, nargs=2,
@@ -242,7 +243,6 @@ def calculate_fid_given_paths(paths, batch_size, cuda, dims):
     model = InceptionV3([block_idx])
     if cuda:
         model.cuda()
-
     m1, s1 = _compute_statistics_of_path(paths[0], model, batch_size,
                                          dims, cuda)
     m2, s2 = _compute_statistics_of_path(paths[1], model, batch_size,
