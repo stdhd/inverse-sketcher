@@ -34,6 +34,8 @@ def load_trained_model(folder):
     mod.model.load_state_dict(state_dicts["model_state_dict"])
 
     split = (state_dicts["train_split"], state_dicts["test_split"])
+    if not state_dicts.get("data_path", False):
+        state_dicts["data_path"] = "dataset/SketchyDatabase/256x256"
     return mod, split, state_dicts
 
 def saliency_map(device, model_list):
@@ -44,8 +46,6 @@ def saliency_map(device, model_list):
         except:
             print("generate folder exists, so plot is overwritten")
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
-        if not params.get("data_path", False):
-            params["data_path"] = "dataset/SketchyDatabase/256x256"
 
         __, dataloader_test, ___, test_split = train.create_dataloaders(
             params["data_path"],
@@ -114,10 +114,6 @@ def generate_from_testset(device, model_list):
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
-        if not params.get("data_path", False):
-            params["data_path"] = "dataset/SketchyDatabase/256x256"
-
-
 
         __, dataloader_test, ___, test_split = train.create_dataloaders(
             params["data_path"],
@@ -175,8 +171,6 @@ def sanity_check(device, model_list):
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
-        if not params.get("data_path", False):
-            params["data_path"] = "dataset/SketchyDatabase/256x256"
 
         dataloader_train, dataloader_test, ___, test_split = train.create_dataloaders(
             params["data_path"],
