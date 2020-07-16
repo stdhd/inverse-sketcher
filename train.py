@@ -192,6 +192,9 @@ def train_ae(encoder_sizes, decoder_sizes, train_loader, num_epochs=50):
             epoch_loss += loss.item()/len(dataloader_train)
             optimizer.step()
         print("AutoEncoder pretraining: Epoch {} Loss: {}".format(epoch, epoch_loss))
+    del AE.decoder
+    optimizer.zero_grad()
+    del optimizer
     return AE.encoder
 
 if __name__ == "__main__":
@@ -264,6 +267,7 @@ if __name__ == "__main__":
         print("Starting training for params:")
         pp.pprint(params)
         if params["model_params"].get("pretrain_cond", False) and not params.get("load_model", False):
+            del model.cond_net
             model.cond_net = train_ae(params["model_params"]["encoder_sizes"], params["model_params"]["decoder_sizes"], dataloader_train)
         for e in range(params["n_epochs"]):
             epoch += 1

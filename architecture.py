@@ -18,6 +18,7 @@ def get_model_by_params(params):
     else:
         raise(ValueError("Model architecture is not defined"))
     if params["model_params"].get("pretrain_cond", False):
+        del model.cond_net
         model.cond_net = AutoEncoder(params["model_params"]["encoder_sizes"], params["model_params"]["decoder_sizes"]).encoder
     return model
 
