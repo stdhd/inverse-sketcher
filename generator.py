@@ -36,6 +36,50 @@ def load_trained_model(folder):
     split = (state_dicts["train_split"], state_dicts["test_split"])
     return mod, split, state_dicts
 
+def saliency_map(device, model_list):
+    for model_name in model_list:
+        print('Saliency map from model {}'.format(model_name))
+        try:
+            os.makedirs(os.path.join("generator", model_name))
+        except:
+            print("generate folder exists, so plot is overwritten")
+        model, split, params = load_trained_model(os.path.join("saved_models", model_name))
+        if not params.get("data_path", False):
+            params["data_path"] = "dataset/SketchyDatabase/256x256"
+
+        __, dataloader_test, ___, test_split = train.create_dataloaders(
+            params["data_path"],
+            params["batch_size"],
+            params["test_ratio"],
+            only_classes=params.get("only_classes", None),
+            split=split,
+            only_one_sample=params.get("only_one_sample", False),
+            load_on_request=True
+        )
+        model.to(device)
+        for i, (batch_condition, batch_inputs, batch_labels) in enumerate(dataloader_test):
+            for j in range(batch_condition.size()[0]):
+                condition = torch.tensor(batch_condition[j].unsqueeze(0))
+                input = torch.tensor(batch_inputs[j].unsqueeze(0))
+                model.eval()
+                condition.requires_grad_()
+                gauss_samples = torch.randn(input.shape[0], input.shape[1] * input.shape[2] * input.shape[3]).to(device)
+                generated = model(x=gauss_samples, c=condition, rev=True)
+                loss = torch.mean(generated ** 2 / 2) - torch.mean(model.log_jacobian()) / generated.shape[1]
+                loss.backward()
+                saliency = condition.grad.data.abs()
+                # create heatmap
+                fig, ax = plt.subplots(1, 2)
+                ax[0].imshow(condition.squeeze().detach().numpy(), cmap='Greys')
+                ax[0].imshow(saliency[0].squeeze().detach().numpy(), cmap='Reds', alpha=0.4)
+                ax[1].imshow(generated.squeeze().permute(1, 2, 0).detach().numpy())
+                ax[0].axis('off')
+                ax[1].axis('off')
+                plt.savefig(
+                    os.path.join("generator", model_name, "gradient_batch{}_{}.png".format(i, j)),
+                    bbox_inches='tight')
+                plt.close(fig)
+
 def visualize_graph(model_list):
     for model_name in model_list:
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
@@ -43,22 +87,25 @@ def visualize_graph(model_list):
 
 def latent_gauss(model_name, data, path, bins=50):
     plt.figure(figsize=[10., 5.])
-    x = np.linspace(-5, 5, 1000)
+    x = np.linspace(-5, 5, bins)
     y = scipy.stats.norm.pdf(x, 0, 1)
-
     plt.figure()
-    plt.title('Model: ' + model_name + ' N= ' + str(data.shape[0]))
-    plt.hist(data, bins, range=[-5., 5.], density=True)
-    plt.plot(x, y, color='coral')
-    plt.tight_layout()
+    print(data.shape)
+    hist_data, _ = np.histogram()
+    #plt.title('Model: ' + model_name + ' N= ' + str(data.shape[0]))
+    plt.hist(data, bins, range=[-5., 5.], density=True, alpha=0.4)
+    plt.boxplot(x, data)
+    plt.plot(x, y)
+    #plt.bar(x, bars, alpha=0.4)
+
 
     try:
         os.makedirs(os.path.join("generator", model_name))
     except:
         print("generate folder exists, so plot is overwritten")
 
-    plt.savefig(os.path.join("generator", model_name, "GaussianLatent.pdf"))
-
+    plt.savefig(os.path.join("generator", model_name, "GaussianLatent_all.pdf"))
+    plt.close()
 
 def generate_from_testset(device, model_list):
     for model_name in model_list:
@@ -107,8 +154,6 @@ def generate_from_testset(device, model_list):
                     axes[i % 3, 0].axis('off')
                     axes[i % 3, 1].axis('off')
                     axes[i % 3, 2].axis('off')
-
-
                     if i % 3 == 2 or i == batch_inputs.shape[0] - 1:
                         plt.savefig(
                             os.path.join("generator", model_name, "out_batch{}_{}.pdf".format(batch_no, subset)),
@@ -146,8 +191,9 @@ def sanity_check(device, model_list):
                 batch_inputs, batch_conditions = batch_inputs.to(device), batch_conditions.to(device)
                 sanity_check = model(x=batch_inputs, c=batch_conditions, rev=False)
 
-                sanity_data = np.append(sanity_data, sanity_check.cpu().detach().numpy()[:, ..., 0])
+                sanity_data = np.append(sanity_data, sanity_check.cpu().detach().numpy()[:, ..., :])
             # Plot sanity check data
+                break
             latent_gauss(model_name, sanity_data, "")
 
 
@@ -175,6 +221,7 @@ if __name__ == "__main__":
     parser.add_argument('--onlygenerate', help='Only generate, no sanity check', action='store_true')
     parser.add_argument('--onlysanity', help='Only sanity check, no generation', action='store_true')
     parser.add_argument('--makegraph', help='Draw graph', action='store_true')
+    parser.add_argument('--saliencymap', help='Draw saliency map', action='store_true')
     args = parser.parse_args()
     device = None
 
@@ -192,6 +239,9 @@ if __name__ == "__main__":
     else:
         print("No model name specified in command line arguments. Will use hard-coded mode list...")
         model_list = ["default_0710_0g"]
+
+    if args.saliencymap:
+        saliency_map(device, model_list)
 
     if args.onlygenerate:
         generate_from_testset(device, model_list)
