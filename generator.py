@@ -138,7 +138,6 @@ def generate_from_testset(device, model_list):
                 gauss_samples = torch.randn(batch_inputs.shape[0],
                                             batch_inputs.shape[1] * batch_inputs.shape[2] * batch_inputs.shape[3]).to(
                     device)
-                batch_conditions = batch_conditions.to(device)
                 batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
                 subset = 0
                 fig, axes = plt.subplots(nrows=3, ncols=3)
