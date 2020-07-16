@@ -4,6 +4,7 @@ n_epochs: 400
 #Optimizer
 optimizer: Adam
 optimizer_params: {lr: 0.0002, weight_decay: 0.00001}
+
 test_ratio: 0.1
 
 #Model

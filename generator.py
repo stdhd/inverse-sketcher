@@ -87,6 +87,7 @@ def visualize_graph(model_list):
 
 def latent_gauss(model_name, data, path, bins=50):
     plt.figure(figsize=[10., 5.])
+
     x = np.linspace(-5, 5, bins)
     y = scipy.stats.norm.pdf(x, 0, 1)
     plt.figure()
@@ -99,6 +100,7 @@ def latent_gauss(model_name, data, path, bins=50):
     #plt.bar(x, bars, alpha=0.4)
 
 
+
     try:
         os.makedirs(os.path.join("generator", model_name))
     except:
@@ -106,6 +108,7 @@ def latent_gauss(model_name, data, path, bins=50):
 
     plt.savefig(os.path.join("generator", model_name, "GaussianLatent_all.pdf"))
     plt.close()
+
 
 def generate_from_testset(device, model_list):
     for model_name in model_list:
@@ -139,10 +142,12 @@ def generate_from_testset(device, model_list):
                 gauss_samples = torch.randn(batch_inputs.shape[0],
                                             batch_inputs.shape[1] * batch_inputs.shape[2] * batch_inputs.shape[3]).to(
                     device)
+                batch_conditions = batch_conditions.to(device)
                 batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
                 subset = 0
                 fig, axes = plt.subplots(nrows=3, ncols=3)
                 for i in range(batch_inputs.shape[0]):
+
 
                     condition_image = transforms.ToPILImage()(batch_conditions[i].cpu().detach()).convert('L')
                     generated_image = transforms.ToPILImage()(batch_output[i].cpu().detach()).convert("RGB")
@@ -160,10 +165,10 @@ def generate_from_testset(device, model_list):
                             bbox_inches='tight')
                         subset += 1
                         plt.close(fig)
-                    if i % 3 == 2:
                         fig, axes = plt.subplots(nrows=3, ncols=3)
-                if batch_no > 10:
-                    break
+                    if i == batch_inputs.shape[0]:
+                        plt.close(fig)
+                break
 
 
 def sanity_check(device, model_list):
@@ -186,12 +191,13 @@ def sanity_check(device, model_list):
 
         with torch.set_grad_enabled(False):
             sanity_data = np.array([])
-            for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(
-                    tqdm(dataloader_train, "Sanity Check")):
-                batch_inputs, batch_conditions = batch_inputs.to(device), batch_conditions.to(device)
+
+            for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(dataloader_train):
+                batch_conditions, batch_inputs = batch_conditions.to(device), batch_inputs.to(device)
                 sanity_check = model(x=batch_inputs, c=batch_conditions, rev=False)
 
-                sanity_data = np.append(sanity_data, sanity_check.cpu().detach().numpy()[:, ..., :])
+                sanity_data = np.append(sanity_data, sanity_check.cpu().detach().numpy()[:, ..., 3])
+
             # Plot sanity check data
                 break
             latent_gauss(model_name, sanity_data, "")
@@ -240,6 +246,7 @@ if __name__ == "__main__":
         print("No model name specified in command line arguments. Will use hard-coded mode list...")
         model_list = ["default_0710_0g"]
 
+
     if args.saliencymap:
         saliency_map(device, model_list)
 
@@ -251,3 +258,4 @@ if __name__ == "__main__":
         else:
             sanity_check(device, model_list)
             generate_from_testset(device, model_list)
+
