@@ -10,7 +10,6 @@ from architecture import get_model_by_params
 import numpy as np
 import scipy.stats
 from tqdm import tqdm
-import hiddenlayer as hl
 
 
 def load_trained_model(folder):
@@ -80,10 +79,6 @@ def saliency_map(device, model_list):
                     bbox_inches='tight')
                 plt.close(fig)
 
-def visualize_graph(model_list):
-    for model_name in model_list:
-        model, split, params = load_trained_model(os.path.join("saved_models", model_name))
-        hl.build_graph(model, torch.zeros([1, 3, 64, 64]), torch.zeros([1, 1, 64, 64]))
 
 def latent_gauss(model_name, data, path, bins=50):
     plt.figure(figsize=[10., 5.])

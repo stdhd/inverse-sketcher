@@ -75,8 +75,9 @@ if __name__ == "__main__":
     if not args.nocuda and torch.cuda.is_available():
         device = torch.device('cuda')
         print("CUDA enabled.")
-    if args.nocuda:
+    else:
         device = torch.device('cpu')
+
     for model_name in args.modelnames:
         path = generate_pngs(device, model_name, args)
         fid_value = calculate_fid_given_paths([path, 'dataset/ShoeV2_F/photo/shoe'], batch_size=args.batchsize, cuda=not args.nocuda, dims=768)
