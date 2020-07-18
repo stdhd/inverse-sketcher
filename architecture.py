@@ -29,13 +29,15 @@ def random_orthog(n):
     return w
 
 
-def sub_conv(ch_hidden, kernel, num_hidden_layers=0, num_classes=0):
+def sub_conv(ch_hidden, kernel, num_hidden_layers=0, num_classes=0, batchnorm=True):
     pad = kernel // 2
-    if num_classes < 2:
-        bn = lambda ch_out: nn.BatchNorm2d(ch_out)
+    if batchnorm: 
+        if num_classes < 2:
+            bn = lambda ch_out: nn.BatchNorm2d(ch_out)
+        else:
+            bn = lambda ch_out: ConditionalBatchNorm2d(ch_out, num_classes)
     else:
-        bn = lambda ch_out: ConditionalBatchNorm2d(ch_out, num_classes)
-
+        bn = lambda ch_out: Identity()
     return lambda ch_in, ch_out: nn.Sequential(
         nn.Conv2d(ch_in, ch_hidden, kernel, padding=pad),
         nn.LeakyReLU(),
@@ -46,11 +48,14 @@ def sub_conv(ch_hidden, kernel, num_hidden_layers=0, num_classes=0):
         )
 
 
-def sub_fc(ch_hidden, num_hidden_layers=0, dropout=0.0, num_classes=0):
-    if num_classes < 2:
-        bn = lambda ch_out: nn.BatchNorm1d(ch_out)
+def sub_fc(ch_hidden, num_hidden_layers=0, dropout=0.0, num_classes=0, batchnorm=True):
+    if batchnorm:
+        if num_classes < 2:
+            bn = lambda ch_out: nn.BatchNorm1d(ch_out)
+        else:
+            bn = lambda ch_out: ConditionalBatchNorm1d(ch_out, num_classes)
     else:
-        bn = lambda ch_out: ConditionalBatchNorm1d(ch_out, num_classes)
+        bn = lambda ch_out: Identity()
 
     return lambda ch_in, ch_out: nn.Sequential(
         nn.Linear(ch_in, ch_hidden),
@@ -163,7 +168,7 @@ def baseline_glow(m_params):
     for k in range(m_params['blocks_per_group'][0]):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {'subnet_constructor': sub_conv(64, m_params['kernel_size_per_group'][0],
-                                                             m_params['hidden_layers_per_group'][0]),
+                                                             m_params['hidden_layers_per_group'][0], batchnorm=m_params.get("bn", True)),
                               'clamp': m_params['clamping_per_group'][0]},
                              conditions=conditions[0],
                              name=F'block_{k}'))
@@ -183,7 +188,7 @@ def baseline_glow(m_params):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                               {
                                  'subnet_constructor': sub_conv(128, m_params['kernel_size_per_group'][1],
-                                                                m_params['hidden_layers_per_group'][1]),
+                                                                m_params['hidden_layers_per_group'][1], batchnorm=m_params.get("bn", True)),
                                  'clamp': m_params['clamping_per_group'][1],
                              },
                              conditions=conditions[1],
@@ -210,7 +215,7 @@ def baseline_glow(m_params):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {
                                  'subnet_constructor': sub_conv(256, m_params['kernel_size_per_group'][2][k],
-                                                                m_params['hidden_layers_per_group'][2]),
+                                                                m_params['hidden_layers_per_group'][2], batchnorm=m_params.get("bn", True)),
                                  'clamp': m_params['clamping_per_group'][2],
                              },
                              conditions=conditions[2],
@@ -237,7 +242,7 @@ def baseline_glow(m_params):
         nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
                              {
                                  'clamp': m_params['clamping_per_group'][3],
-                                 'subnet_constructor': sub_fc(m_params['fc_size'], m_params['hidden_layers_per_group'][3], dropout=m_params['dropout_fc'])
+                                 'subnet_constructor': sub_fc(m_params['fc_size'], m_params['hidden_layers_per_group'][3], dropout=m_params['dropout_fc'], batchnorm=m_params.get("bn", True))
                              },
                              conditions=conditions[3],
                              name=F'block_{k + 10}'))
@@ -436,3 +441,9 @@ class ConditionalBatchNorm1d(nn.Module):
         gamma, beta = self.embed(y).chunk(2, 1)
         out = gamma.view(-1, self.num_features) * out + beta.view(-1, self.num_features)
         return out
+
+class Identity(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+    def forward(self, x):
+        return x
