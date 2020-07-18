@@ -115,8 +115,8 @@ def load_state(param):
     model = get_model(param)
     scheduler, optimizer = get_optimizer(param, model.parameters())
     try:
-        print(param.get("load_model")+f"/{param.get('model_name')}.tar")
-        state_dicts = torch.load("saved_models/" + param.get("load_model")+f"/{param.get('model_name')}.tar", map_location=device)
+        print(param.get("model_name")+f"/{param.get('model_name')}.tar")
+        state_dicts = torch.load("saved_models/" + param.get('model_name') +f"/{param.get('model_name')}.tar", map_location=device)
     except:
         raise (RuntimeError("Could not load training state parameters for " + param.get('model_name') + "."))
     model.model.load_state_dict(state_dicts["model_state_dict"])

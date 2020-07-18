@@ -10,7 +10,6 @@ from architecture import get_model_by_params
 import numpy as np
 import scipy.stats
 from tqdm import tqdm
-import hiddenlayer as hl
 
 
 def load_trained_model(folder):
@@ -34,6 +33,8 @@ def load_trained_model(folder):
     mod.model.load_state_dict(state_dicts["model_state_dict"])
 
     split = (state_dicts["train_split"], state_dicts["test_split"])
+    if not state_dicts.get("data_path", False):
+        state_dicts["data_path"] = "dataset/SketchyDatabase/256x256"
     return mod, split, state_dicts
 
 def saliency_map(device, model_list):
@@ -44,8 +45,6 @@ def saliency_map(device, model_list):
         except:
             print("generate folder exists, so plot is overwritten")
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
-        if not params.get("data_path", False):
-            params["data_path"] = "dataset/SketchyDatabase/256x256"
 
         __, dataloader_test, ___, test_split = train.create_dataloaders(
             params["data_path"],
@@ -80,10 +79,6 @@ def saliency_map(device, model_list):
                     bbox_inches='tight')
                 plt.close(fig)
 
-def visualize_graph(model_list):
-    for model_name in model_list:
-        model, split, params = load_trained_model(os.path.join("saved_models", model_name))
-        hl.build_graph(model, torch.zeros([1, 3, 64, 64]), torch.zeros([1, 1, 64, 64]))
 
 def latent_gauss(model_name, data, path, bins=50):
     plt.figure(figsize=[10., 5.])
@@ -114,10 +109,6 @@ def generate_from_testset(device, model_list):
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
-        if not params.get("data_path", False):
-            params["data_path"] = "dataset/SketchyDatabase/256x256"
-
-
 
         __, dataloader_test, ___, test_split = train.create_dataloaders(
             params["data_path"],
@@ -142,7 +133,6 @@ def generate_from_testset(device, model_list):
                 gauss_samples = torch.randn(batch_inputs.shape[0],
                                             batch_inputs.shape[1] * batch_inputs.shape[2] * batch_inputs.shape[3]).to(
                     device)
-                batch_conditions = batch_conditions.to(device)
                 batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
                 subset = 0
                 fig, axes = plt.subplots(nrows=3, ncols=3)
@@ -175,8 +165,6 @@ def sanity_check(device, model_list):
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
-        if not params.get("data_path", False):
-            params["data_path"] = "dataset/SketchyDatabase/256x256"
 
         dataloader_train, dataloader_test, ___, test_split = train.create_dataloaders(
             params["data_path"],
