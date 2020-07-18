@@ -8,6 +8,7 @@ from PIL import Image
 import torchvision
 from tqdm import tqdm
 import numpy as np
+from random import uniform
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,8 @@ class ImageDataSet(Dataset):
                                     path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("-")[0] + ".jpg")
                                 elif "ShoeV2_F" in path_sketch:
                                     path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("_")[0] + ".png")
+                                elif "flickr" in path_sketch:
+                                    path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("_")[0] + ".png")
                                 else:
                                     raise(RuntimeError("Unknown dataset {}".format(self.__sketch_dir.split("/")[1])))
                                 if not os.path.exists(path_real):
@@ -95,7 +98,7 @@ class ImageDataSet(Dataset):
                                         sub = False
                                     else:
                                         sketch = sketch.convert("L")
-                                        sub = True
+                                        sub = "SketchyDatabase" in path_sketch
                                     if not self.__transform is None:
                                         sketch = self.__transform(sketch)
                                         image = self.__transform(image)
@@ -160,7 +163,7 @@ class ImageDataSet(Dataset):
                 sub = False
             else:
                 sketch = sketch.convert("L")
-                sub = True
+                sub = "SketchyDatabase" in path_sketch
 
             image = Image.open(path_real)
 
@@ -187,3 +190,44 @@ class ImageDataSet(Dataset):
             image, sketch = meta.get_images()
 
         return sketch, image, meta.get_class()
+
+
+class CompositeIterSingle():
+    def __init__(self, loader1, loader2, p):
+        self.loader1 = iter(loader1)
+        self.loader2 = iter(loader2)
+        self.p = p
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if uniform(0, 1) > self.p:
+            return self.loader2.__next__()
+        else:
+            return self.loader1.__next__()
+
+    def __len__(self):
+        return len(self.loader1)# + len(self.loader2)
+
+class CompositeDataloader(object):
+    def __init__(self, dataloader1, dataloader2, p=0.5, anneal_rate=1):
+        self.dataloader1 = dataloader1
+        self.dataloader2 = dataloader2
+        assert anneal_rate >= 0 and anneal_rate <= 1, "please choose anneal betweem 0 and 1 and order datasets accordingly"
+        self.anneal_rate = anneal_rate
+        self.p = p
+        self.iter = CompositeIterSingle(self.dataloader1, self.dataloader2, self.p)
+
+    def __iter__(self):
+        return self.iter
+
+    def __len__(self):
+        return len(self.iter)
+
+    def set_p(self, p):
+        self.p = p
+        self.iter.p = p
+
+    def anneal_p(self):
+        self.set_p(1 - (1 - self.p)*self.anneal_rate)

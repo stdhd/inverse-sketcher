@@ -65,7 +65,7 @@ def get_transform():
     return transforms.Resize((64, 64))
 
 
-def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None, only_one_sample=False, load_on_request=False):
+def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None, only_one_sample=False, load_on_request=False, add_data=None, p=1):
     """
     Create data loaders from ImageDataSet according parameters. If split is provided, it is used by the data loader.
     :param data_path: path of root directory of data set, while directories 'photo' and 'sketch' are sub directories
@@ -87,7 +87,16 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
         train_split, test_split = perm[:math.ceil(len(data_set) * (1-test_ratio))], perm[math.ceil(len(data_set) * (1-test_ratio)):]
     else:
         train_split, test_split = split[0], split[1]
-    dataloader_train = DataLoader(Subset(data_set, train_split), batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+    if add_data:
+        data_set_add = data.ImageDataSet(root_dir=add_data, transform=get_transform(), only_classes=only_classes, only_one_sample=only_one_sample, load_on_request=load_on_request)
+        dataloader_train = data.CompositeDataloader(DataLoader(Subset(data_set, train_split), batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True),
+                                                    DataLoader(data_set_add, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True),
+                                                    p=p,
+                                                    anneal_rate=0.99)
+    else:
+        dataloader_train = DataLoader(Subset(data_set, train_split), batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+        dataloader_train.p = p
+        dataloader_train.anneal_p = lambda *args : None
     dataloader_test = DataLoader(Subset(data_set, test_split), batch_size=batch_size, shuffle=False, num_workers=0)
 
     return dataloader_train, dataloader_test, train_split, test_split
@@ -115,8 +124,9 @@ def load_state(param):
     model = get_model(param)
     scheduler, optimizer = get_optimizer(param, model.parameters())
     try:
-        print(param.get("model_name")+f"/{param.get('model_name')}.tar")
-        state_dicts = torch.load("saved_models/" + param.get('model_name') +f"/{param.get('model_name')}.tar", map_location=device)
+        print("saved_models/" + param.get("model_name")+f"/{param.get('model_name')}.tar")
+        state_dicts = torch.load("saved_models/" + param.get("model_name")+f"/{param.get('model_name')}.tar", map_location=device)
+
     except:
         raise (RuntimeError("Could not load training state parameters for " + param.get('model_name') + "."))
     model.model.load_state_dict(state_dicts["model_state_dict"])
@@ -132,10 +142,14 @@ def load_state(param):
         scheduler.load_state_dict(state_dicts["scheduler_state_dict"])
     except:
         print("Warning, could not load scheduler state dict, continuing with default values")
-    return model, optimizer, epoch, split, scheduler
+    try:
+        p = state_dicts["prob_data1"]
+    except:
+        p=param.get("prob_data1")
+    return model, optimizer, epoch, split, scheduler, p
 
 
-def save_state(param, model_state, optim_state, scheduler_state, epoch, running_loss, split, overwrite_chkpt=True):
+def save_state(param, model_state, optim_state, scheduler_state, epoch, running_loss, split, p, overwrite_chkpt=True):
     """
     Save state of training into yaml file in folder saved_models
     :param param: dictionary of used parameters
@@ -161,7 +175,8 @@ def save_state(param, model_state, optim_state, scheduler_state, epoch, running_
         'only_one_sample': param.get('only_one_sample', False),
         'scheduler_state_dict': scheduler_state,
         'architecture': param.get("architecture"),
-        'data_path': param.get("data_path")
+        'data_path': param.get("data_path"),
+        'prob_data1': p
     }, f"{path}.tar")
 
 def validate(model, dataloader_test):
@@ -239,14 +254,16 @@ if __name__ == "__main__":
 
         if params.get("load_model", False):
             # Load training progress from existing split
-            model, optimizer, epoch, split, scheduler = load_state(params)
+            model, optimizer, epoch, split, scheduler, p = load_state(params)
             dataloader_train, dataloader_test, train_split, test_split = create_dataloaders(params["data_path"],
                                                                                             params["batch_size"],
                                                                                             params["test_ratio"],
                                                                                             split=split,
                                                                                             only_classes=params.get('only_classes', None),
                                                                                             only_one_sample=params.get('only_one_sample', False),
-                                                                                            load_on_request=args.nopreload)
+                                                                                            load_on_request=args.nopreload,
+                                                                                            add_data=params.get("add_data"),
+                                                                                            p=p)
         else:
             # Init new training with new split
             model = get_model(params)
@@ -257,7 +274,9 @@ if __name__ == "__main__":
                                                                                             params["test_ratio"],
                                                                                             only_classes=params.get('only_classes', None),
                                                                                             only_one_sample=params.get('only_one_sample', False),
-                                                                                            load_on_request=args.nopreload)
+                                                                                            load_on_request=args.nopreload,
+                                                                                            add_data=params.get("add_data"),
+                                                                                            p=params.get("prob_data1"))
             split = (train_split, test_split)
         if params.get("half_precision", False):
             model.half()
@@ -283,13 +302,14 @@ if __name__ == "__main__":
                 epoch_loss += loss.item()/len(dataloader_train)
                 loss_summary = np.append(loss_summary, loss.item())
                 optimizer.step()
+            dataloader_train.anneal_p()
             scheduler.step()
             #scheduler.step(validate(model, dataloader_test))
             np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}'.format(params["model_name"],  str(epoch))), loss_summary, fmt='%1.3f')
             print("Epoch {} / {} Training Loss: {}, Validation Loss: {}".format(e + 1, params["n_epochs"], epoch_loss, validate(model, dataloader_test)))
 
             if not args.nocheckpoints:
-                save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
+                save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split, dataloader_train.p)
 
         np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}_FINAL'.format(params["model_name"], str(epoch))),
                    loss_summary, fmt='%1.3f')
@@ -301,7 +321,7 @@ if __name__ == "__main__":
         plt.close()
 
         if args.nocheckpoints:
-            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split)
+            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split, dataloader_train.p)
             print("Model is saved to {}".format(params["save_dir"]))
 
         print('%.3i \t%.6f min' % (epoch, (time() - t_start) / 60.))
