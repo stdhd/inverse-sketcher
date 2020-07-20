@@ -89,9 +89,9 @@ if __name__ == "__main__":
         dataset = torchvision.datasets.ImageFolder(root='dataset/ShoeV2_F/photo', transform=torchvision.transforms.ToTensor())
 
         is_value = inception_score(dataset, device, args.batchsize, resize=True)
-	print(fid_value)
-	print(is_value)
+        print(fid_value)
+        print(is_value)
         with open(os.path.join('generator', model_name, 'metric_results.txt'), "a") as resultfile:
-		resultfile.write("FID SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, dims, fid_value))
-		resultfile.write("IS  SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, is_value))
+            resultfile.write("FID SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, dims, fid_value))
+            resultfile.write("IS  SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, is_value))
 
