@@ -2,6 +2,7 @@
 # python3 metrics_wrapper.py Shoes_0715_0 --nocuda --batchsize 10 --filecount 5
 
 from metrics.fid_score import calculate_fid_given_paths
+from metrics.inception_score import inception_score
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from generator import load_trained_model
 from torchvision.utils import save_image
@@ -9,6 +10,7 @@ import os
 import train
 import torch
 from tqdm import tqdm
+import torchvision
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('modelnames', nargs='+', help='model names for which to calculate scores')
@@ -80,9 +82,14 @@ if __name__ == "__main__":
 
     for model_name in args.modelnames:
         path = generate_pngs(device, model_name, args)
-        fid_value = calculate_fid_given_paths([path, 'dataset/ShoeV2_F/photo/shoe'], batch_size=args.batchsize, cuda=not args.nocuda, dims=768)
+        dims = 2048 # Pooling layer before last layer
+        fid_value = calculate_fid_given_paths([path, 'dataset/ShoeV2_F/photo/shoe'], batch_size=args.batchsize,
+                                              cuda=not args.nocuda, dims=dims)
+        dataset = torchvision.datasets.ImageFolder(root='dataset/ShoeV2_F/photo/shoe')
+
+        is_value = inception_score.inception_score(dataset, device, args.batchsize, resize=True)
         print(fid_value)
         with open(os.path.join('generator', model_name, 'metric_results.txt'), "a") as resultfile:
-            resultfile.write("FID SCORE FOR N={}: \n{}########\n\n".format(args.filecount, fid_value))
+            resultfile.write("FID SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, dims, fid_value))
 
 
