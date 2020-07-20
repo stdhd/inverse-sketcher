@@ -84,14 +84,14 @@ if __name__ == "__main__":
     for model_name in args.modelnames:
         path = generate_pngs(device, model_name, args)
         dims = 2048 # Pooling layer before last layer
-        fid_value = calculate_fid_given_paths([path, 'dataset/ShoeV2_F/photo/shoe'], batch_size=args.batchsize,
-                                              cuda=not args.nocuda, dims=dims)
+        #fid_value = calculate_fid_given_paths([path, 'dataset/ShoeV2_F/photo/shoe'], batch_size=args.batchsize,
+         #                                     cuda=not args.nocuda, dims=dims)
         dataset = torchvision.datasets.ImageFolder(root='dataset/ShoeV2_F/photo', transform=torchvision.transforms.ToTensor())
 
-        is_value = inception_score(dataset, device, args.batchsize, resize=True)
-        print(fid_value)
-        print(is_value)
+        is_value_mean, is_value_std = inception_score(dataset, device, args.batchsize, resize=True)
+        #print(fid_value)
+        print(is_value_mean, is_value_std)
         with open(os.path.join('generator', model_name, 'metric_results.txt'), "a") as resultfile:
-            resultfile.write("FID SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, dims, fid_value))
-            resultfile.write("IS  SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, is_value))
+           # resultfile.write("FID SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, dims, fid_value))
+            resultfile.write("IS  SCORE FOR N={} MEAN:{}  STD:{}\n########\n\n".format(args.filecount, is_value_mean, is_value_std))
 
