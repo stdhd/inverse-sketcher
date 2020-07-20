@@ -46,7 +46,8 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
     # Get predictions
     preds = np.zeros((N, 1000))
 
-    for i, batch in enumerate(dataloader, 0):
+    for i, (batch, labl) in enumerate(dataloader, 0):
+        print(labl)
         batch = batch.type(dtype)
         batchv = Variable(batch)
         batch_size_i = batch.size()[0]
