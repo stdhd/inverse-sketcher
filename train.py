@@ -309,7 +309,7 @@ if __name__ == "__main__":
             print("Epoch {} / {} Training Loss: {}, Validation Loss: {}".format(e + 1, params["n_epochs"], epoch_loss, validate(model, dataloader_test)))
 
             if not args.nocheckpoints:
-                save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split, dataloader_train.p)
+                save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, epoch_loss, split, dataloader_train.p)
 
         np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}_FINAL'.format(params["model_name"], str(epoch))),
                    loss_summary, fmt='%1.3f')
@@ -321,7 +321,7 @@ if __name__ == "__main__":
         plt.close()
 
         if args.nocheckpoints:
-            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, loss, split, dataloader_train.p)
+            save_state(params, model.model.state_dict(), optimizer.state_dict(), scheduler.state_dict(), epoch, epoch_loss, split, dataloader_train.p)
             print("Model is saved to {}".format(params["save_dir"]))
 
         print('%.3i \t%.6f min' % (epoch, (time() - t_start) / 60.))
