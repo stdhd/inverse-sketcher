@@ -97,16 +97,16 @@ if __name__ == "__main__":
             print("Calculating FID score for Model {}...".format(model_name))
             dims = 2048 # Pooling layer before last layer
             fid_value = calculate_fid_given_paths([path, reference_path], batch_size=args.batchsize,
-                                                 cuda=device=='cuda', dims=dims)
+                                                 cuda=device==torch.device('cuda'), dims=dims)
             print("FID: ", fid_value)
             with open(os.path.join('generator', model_name, 'metric_results.txt'), "a") as resultfile:
                 resultfile.write("FID SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, dims, fid_value))
 
         if not args.nois:
-            dataset = torchvision.datasets.ImageFolder(root=os.path.join('generator', model_name, 'ready_pngs'),
+            dataset = torchvision.datasets.ImageFolder(root=os.path.join('generator', model_name),
                                                        transform=torchvision.transforms.ToTensor())
             print("Calculating inception score for Model {}...".format(model_name))
-            is_value_mean, is_value_std = inception_score(dataset, device=='cuda', args.batchsize, resize=True)
+            is_value_mean, is_value_std = inception_score(dataset, device==torch.device('cuda'), args.batchsize, resize=True)
             print("IS: mean, std", is_value_mean, " ", is_value_std)
             with open(os.path.join('generator', model_name, 'metric_results.txt'), "a") as resultfile:
                 resultfile.write(
