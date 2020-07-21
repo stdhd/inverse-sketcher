@@ -10,13 +10,16 @@ import os
 import train
 import torch
 from tqdm import tqdm
-import torchvision
 import torchvision.transforms
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('modelnames', nargs='+', help='model names for which to calculate scores')
 parser.add_argument('--nocuda', help='Disable CUDA', action='store_true')
 parser.add_argument('--nogenerate', help='Disable generator of png files', action='store_true')
+parser.add_argument('--nofid', help='Do not calculate FID', action='store_true')
+parser.add_argument('--nois', help='Do not calculate IS', action='store_true')
+parser.add_argument('--refshoes', help='Use shoe dataset as reference', action='store_true')
+parser.add_argument('--refsketches', help='Use sketch dataset as reference', action='store_true')
 parser.add_argument('--batchsize', type=int, default=50,
                     help='Batch size to use')
 parser.add_argument('--filecount', type=int, default=-1,
@@ -25,7 +28,6 @@ parser.add_argument('--filecount', type=int, default=-1,
 
 def generate_pngs(device, model_name, args):
     model, split, params = load_trained_model(os.path.join("saved_models", model_name))
-    print("Calculating FID score for Model {}...".format(model_name))
     path = os.path.join('generator', model_name)
     save_path = os.path.join(path, 'pngs')
     if os.path.exists(os.path.join(path, 'ready_pngs')):
@@ -73,6 +75,7 @@ def generate_pngs(device, model_name, args):
         raise(RuntimeError("Could not flag directory 'pngs' as ready"))
     return os.path.join(path, 'ready_pngs')
 
+
 if __name__ == "__main__":
     args = parser.parse_args()
     if not args.nocuda and torch.cuda.is_available():
@@ -83,15 +86,32 @@ if __name__ == "__main__":
 
     for model_name in args.modelnames:
         path = generate_pngs(device, model_name, args)
-        dims = 2048 # Pooling layer before last layer
-        #fid_value = calculate_fid_given_paths([path, 'dataset/ShoeV2_F/photo/shoe'], batch_size=args.batchsize,
-         #                                     cuda=not args.nocuda, dims=dims)
-        dataset = torchvision.datasets.ImageFolder(root='dataset/ShoeV2_F/photo', transform=torchvision.transforms.ToTensor())
+        if args.refshoes:
+            reference_path = 'dataset/ShoeV2_F/photo/shoe'
+        elif args.refsketches:
+            reference_path = 'dataset/SketchyDatabase/256x256/photo'
+        else:
+            raise ValueError('Specify reference dataset with --refshoes or --refsketches')
 
-        is_value_mean, is_value_std = inception_score(dataset, device, args.batchsize, resize=True)
-        #print(fid_value)
-        print(is_value_mean, is_value_std)
-        with open(os.path.join('generator', model_name, 'metric_results.txt'), "a") as resultfile:
-           # resultfile.write("FID SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, dims, fid_value))
-            resultfile.write("IS  SCORE FOR N={} MEAN:{}  STD:{}\n########\n\n".format(args.filecount, is_value_mean, is_value_std))
+        if not args.nofid:
+            print("Calculating FID score for Model {}...".format(model_name))
+            dims = 2048 # Pooling layer before last layer
+            fid_value = calculate_fid_given_paths([path, reference_path], batch_size=args.batchsize,
+                                                 cuda=device=='cuda', dims=dims)
+            print("FID: ", fid_value)
+            with open(os.path.join('generator', model_name, 'metric_results.txt'), "a") as resultfile:
+                resultfile.write("FID SCORE FOR N={} D={}: \n{}\n########\n\n".format(args.filecount, dims, fid_value))
+
+        if not args.nois:
+            dataset = torchvision.datasets.ImageFolder(root=os.path.join('generator', model_name, 'ready_pngs'),
+                                                       transform=torchvision.transforms.ToTensor())
+            print("Calculating inception score for Model {}...".format(model_name))
+            is_value_mean, is_value_std = inception_score(dataset, device=='cuda', args.batchsize, resize=True)
+            print("IS: mean, std", is_value_mean, " ", is_value_std)
+            with open(os.path.join('generator', model_name, 'metric_results.txt'), "a") as resultfile:
+                resultfile.write(
+                    "IS  SCORE FOR N={} MEAN:{}  STD:{}\n########\n\n".format(args.filecount, is_value_mean,
+                                                                              is_value_std))
+
+        print("DONE.")
 
