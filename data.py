@@ -193,22 +193,27 @@ class ImageDataSet(Dataset):
 
 
 class CompositeIterSingle():
-    def __init__(self, loader1, loader2, p):
+    def __init__(self, loader1, loader2, p, epoch_len=2000):
         self.loader1 = iter(loader1)
         self.loader2 = iter(loader2)
         self.p = p
+        self.epoch_len = epoch_len
+        self.num_calls = 0
 
     def __iter__(self):
         return self
 
     def __next__(self):
+        self.num_calls += 1
+        if self.num_calls > self.epoch_len:
+            raise StopIteration
         if uniform(0, 1) > self.p:
             return self.loader2.__next__()
         else:
             return self.loader1.__next__()
 
     def __len__(self):
-        return len(self.loader1)# + len(self.loader2)
+        return self.epoch_len# + len(self.loader2)
 
 class CompositeDataloader(object):
     def __init__(self, dataloader1, dataloader2, p=0.5, anneal_rate=1):
@@ -220,6 +225,7 @@ class CompositeDataloader(object):
         self.iter = CompositeIterSingle(self.dataloader1, self.dataloader2, self.p)
 
     def __iter__(self):
+        self.iter = CompositeIterSingle(self.dataloader1, self.dataloader2, self.p)
         return self.iter
 
     def __len__(self):

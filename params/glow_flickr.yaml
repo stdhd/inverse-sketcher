@@ -31,5 +31,5 @@ model_params: {dim_cond: [1,256,256], conv_size_cond: 3,
 model_name: "glow_flickr"
 load_model: False
 architecture: "glow"
-add_data: "/home/ubuntu/flickr_data"
+add_data: "dataset/flickr_dataset"
 prob_data1: 0.01
