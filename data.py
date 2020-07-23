@@ -98,7 +98,8 @@ class ImageDataSet(Dataset):
                                         sub = False
                                     else:
                                         sketch = sketch.convert("L")
-                                        sub = "SketchyDatabase" in path_sketch
+                                        sub = True
+                                        #sub = "SketchyDatabase" in path_sketch
                                     if not self.__transform is None:
                                         sketch = self.__transform(sketch)
                                         image = self.__transform(image)
@@ -163,7 +164,8 @@ class ImageDataSet(Dataset):
                 sub = False
             else:
                 sketch = sketch.convert("L")
-                sub = "SketchyDatabase" in path_sketch
+                sub = True
+                #sub = "SketchyDatabase" in path_sketch
 
             image = Image.open(path_real)
 
