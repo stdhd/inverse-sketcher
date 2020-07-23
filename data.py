@@ -73,8 +73,9 @@ class ImageDataSet(Dataset):
         with os.scandir(self.__sketch_dir) as folder_iterator:
             num_classes = 0
             inc = {}
-            for n in self.only_classes:
-                inc[n] = False
+            if self.only_classes:
+                for n in self.only_classes:
+                    inc[n] = False
             for classfolder in tqdm(folder_iterator, "Processing Sketch Metadata"):
                 #label = self.class_numbers.get(classname)
                 #if label is None:
