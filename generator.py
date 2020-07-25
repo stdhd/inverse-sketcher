@@ -187,7 +187,7 @@ def generate_from_testset(device, model_list):
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
 
         __, dataloader_test, ___, test_split = train.create_dataloaders(
-            params["data_path"],
+            params["data_path"], #"dataset/flickr/",
             params["batch_size"],
             params["test_ratio"],
             only_classes=params.get("only_classes", None),

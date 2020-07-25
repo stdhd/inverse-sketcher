@@ -93,6 +93,8 @@ class ImageDataSet(Dataset):
                                     path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("_")[0] + ".png")
                                 elif "flickr" in path_sketch:
                                     path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("_")[0] + ".png")
+                                elif "edges2shoe" in path_sketch:
+                                    path_real = os.path.join(self.__real_dir, classfolder.name, file.name)
                                 else:
                                     raise(RuntimeError("Unknown dataset {}".format(self.__sketch_dir.split("/")[1])))
                                 if not os.path.exists(path_real):

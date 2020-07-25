@@ -87,7 +87,7 @@ if __name__ == "__main__":
     for model_name in args.modelnames:
         path = generate_pngs(device, model_name, args)
         if args.refshoes:
-            reference_path = 'dataset/ShoeV2_F/photo/shoe'
+            reference_path = 'dataset/ShoeV2_F/photo/'
         elif args.refsketches:
             reference_path = 'dataset/SketchyDatabase/256x256/photo'
 
@@ -106,6 +106,8 @@ if __name__ == "__main__":
         if not args.nois:
             dataset = torchvision.datasets.ImageFolder(root=os.path.join('generator', model_name),
                                                        transform=torchvision.transforms.ToTensor())
+            dataset = torchvision.datasets.ImageFolder(root=os.path.join(reference_path),
+                                                       transform=torchvision.transforms.ToTensor())
             print("Calculating inception score for Model {}...".format(model_name))
             is_value_mean, is_value_std = inception_score(dataset, device==torch.device('cuda'), args.batchsize, resize=True)
             print("IS: mean, std", is_value_mean, " ", is_value_std)
@@ -115,4 +117,3 @@ if __name__ == "__main__":
                                                                               is_value_std))
 
         print("DONE.")
-
