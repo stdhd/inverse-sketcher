@@ -71,11 +71,18 @@ class ImageDataSet(Dataset):
         #class1, class2, ...
         tensor_transform = torchvision.transforms.ToTensor()
         with os.scandir(self.__sketch_dir) as folder_iterator:
+            num_classes = 0
+            inc = {}
+            if self.only_classes:
+                for n in self.only_classes:
+                    inc[n] = False
             for classfolder in tqdm(folder_iterator, "Processing Sketch Metadata"):
                 #label = self.class_numbers.get(classname)
                 #if label is None:
                 #    logger.error("Warning: Undefined class name {} in data directory {}".format(classname, self.__root_dir))
                 if os.path.isdir(os.path.join(self.__sketch_dir, classfolder.name)) and (self.only_classes==None or classfolder.name in self.only_classes):
+                    num_classes += 1
+                    inc[classfolder.name] = True
                     with os.scandir(os.path.join(self.__sketch_dir, classfolder.name)) as sketch_iterator:
                         for file in sketch_iterator:
                             if not file.name.startswith(".") and not file.name.endswith(".svg"):
@@ -98,7 +105,8 @@ class ImageDataSet(Dataset):
                                         sub = False
                                     else:
                                         sketch = sketch.convert("L")
-                                        sub = "SketchyDatabase" in path_sketch
+                                        sub = True
+                                        #sub = "SketchyDatabase" in path_sketch
                                     if not self.__transform is None:
                                         sketch = self.__transform(sketch)
                                         image = self.__transform(image)
@@ -127,6 +135,10 @@ class ImageDataSet(Dataset):
                                         print("ONLY-ONE-SAMPLE-MODE (+ one duplicate to create split): Processed {} sketches".format(len(self.__meta)))
                                         return
                         sketch_iterator.close()
+            for n in inc.keys():
+                if not inc[n]:
+                    print("Missing class {}".format(n))
+            print("Training on {} classes".format(num_classes))
             print("Processed {} sketches".format(len(self.__meta)))
             folder_iterator.close()
 
@@ -163,7 +175,8 @@ class ImageDataSet(Dataset):
                 sub = False
             else:
                 sketch = sketch.convert("L")
-                sub = "SketchyDatabase" in path_sketch
+                sub = True
+                #sub = "SketchyDatabase" in path_sketch
 
             image = Image.open(path_real)
 
@@ -222,10 +235,10 @@ class CompositeDataloader(object):
         assert anneal_rate >= 0 and anneal_rate <= 1, "please choose anneal betweem 0 and 1 and order datasets accordingly"
         self.anneal_rate = anneal_rate
         self.p = p
-        self.iter = CompositeIterSingle(self.dataloader1, self.dataloader2, self.p)
+        self.iter = CompositeIterSingle(self.dataloader1, self.dataloader2, self.p, epoch_len=min(2000, len(self.dataloader1)))
 
     def __iter__(self):
-        self.iter = CompositeIterSingle(self.dataloader1, self.dataloader2, self.p)
+        self.iter = CompositeIterSingle(self.dataloader1, self.dataloader2, self.p, epoch_len=min(2000, len(self.dataloader1)))
         return self.iter
 
     def __len__(self):

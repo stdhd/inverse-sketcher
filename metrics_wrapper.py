@@ -67,7 +67,7 @@ def generate_pngs(device, model_name, args):
                         raise (RuntimeError("Could not flag directory 'pngs' as ready"))
                     return os.path.join(path, 'ready_pngs')
                 else:
-                    count += 1
+                    count += 0
 
     try:
         os.rename(save_path, os.path.join(path, 'ready_pngs'))
@@ -90,6 +90,7 @@ if __name__ == "__main__":
             reference_path = 'dataset/ShoeV2_F/photo/shoe'
         elif args.refsketches:
             reference_path = 'dataset/SketchyDatabase/256x256/photo'
+
         else:
             raise ValueError('Specify reference dataset with --refshoes or --refsketches')
 

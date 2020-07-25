@@ -193,7 +193,7 @@ def validate(model, dataloader_test):
     model.train()
     return val_loss
 
-def train_ae(encoder_sizes, decoder_sizes, train_loader, num_epochs=50):
+def train_ae(encoder_sizes, decoder_sizes, train_loader, num_epochs=30):
     AE = AutoEncoder(encoder_sizes, decoder_sizes).to(device)
     optimizer = torch.optim.Adam(AE.parameters(), lr=0.0005, weight_decay=3e-6)
     for epoch in tqdm(range(num_epochs), "Encoder pretraining"):

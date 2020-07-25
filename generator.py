@@ -1,4 +1,6 @@
 import torch
+from PIL import Image
+
 import train
 # import model
 import os
@@ -10,7 +12,9 @@ from architecture import get_model_by_params
 import numpy as np
 import scipy.stats
 from tqdm import tqdm
-
+import torchvision
+from torchvision.utils import save_image
+import PIL
 
 def load_trained_model(folder):
     """
@@ -36,6 +40,7 @@ def load_trained_model(folder):
     if not state_dicts.get("data_path", False):
         state_dicts["data_path"] = "dataset/SketchyDatabase/256x256"
     return mod, split, state_dicts
+
 
 def saliency_map(device, model_list):
     for model_name in model_list:
@@ -104,6 +109,77 @@ def latent_gauss(model_name, data, path, bins=50):
     plt.savefig(os.path.join("generator", model_name, "GaussianLatent_all.pdf"))
     plt.close()
 
+def generate_multiple_for_one(device, model_name, args):
+    model, split, params = load_trained_model(os.path.join("saved_models", model_name))
+    path = os.path.join('generate_multiple_per_sketch', model_name)
+    save_path = os.path.join(path, 'pngs')
+    if os.path.exists(os.path.join(path, 'ready_pngs')):
+        print('ready_pngs folder already exists. Create scores with already generated images')
+        return os.path.join(path, 'ready_pngs')
+    try:
+        os.makedirs(save_path)
+    except:
+        print("generate folder exists, so plots are overwritten")
+    if not os.path.exists(path):
+        raise (RuntimeError('Path to generated images could not be found {}'.format(path)))
+    __, dataloader_test, ___, test_split = train.create_dataloaders(
+        params["data_path"],
+        args.batchsize,
+        params["test_ratio"],
+        only_classes=params.get("only_classes", None),
+        split=split,
+        only_one_sample=params.get("only_one_sample", False),
+        load_on_request=True
+    )
+    model.to(device)
+    count = 1
+    with torch.set_grad_enabled(False):
+        for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(
+                tqdm(dataloader_test, "Visualization")):
+            batch_conditions = batch_conditions.to(device)
+
+            for i in range(batch_conditions.shape[0]):
+                save_image(batch_conditions[i], os.path.join(save_path, 'sk_img_b{}_i{}.png'.format(batch_no, i)))
+
+            for j in range(5):
+                gauss_samples = torch.randn(batch_inputs.shape[0],
+                                            batch_inputs.shape[1] * batch_inputs.shape[2] * batch_inputs.shape[3]).to(
+                    device)
+                batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
+                for ij in range(batch_output.shape[0]):
+                    save_image(batch_output[ij], os.path.join(save_path, 'img_b{}_i{}_{}.png'.format(batch_no, ij, j)))
+
+
+    try:
+        os.rename(save_path, os.path.join(path, 'ready_pngs'))
+    except:
+        raise(RuntimeError("Could not flag directory 'pngs' as ready"))
+    return os.path.join(path, 'ready_pngs')
+
+
+def generate_from_image(image_name, model_list):
+
+    for model_name in model_list:
+        print('Generate from model {}'.format(model_name))
+        model, split, params = load_trained_model(os.path.join("saved_models", model_name))
+        sketch = Image.open(os.path.join('comparing_generator', image_name))
+
+        sketch = sketch.convert("L")
+        model.eval()
+        with torch.set_grad_enabled(False):
+            tensor_transform = torchvision.transforms.ToTensor()
+            sketch = sketch.resize((64, 64))
+            sketch = tensor_transform(sketch)
+            #sketch = 1 - sketch
+            sketch += 0.002 * torch.randn_like(sketch)
+            sketch = torch.unsqueeze(sketch, 0)
+            for i in range(10):
+                noise = torch.randn(1, 3 * 64 * 64)
+                result = model(x=noise, c=sketch, rev=True).squeeze()
+                trans2 = transforms.ToPILImage()
+                result_img = trans2(result)
+                result_img.save(os.path.join('comparing_generator', "{}_model_{}-{}.png".format(image_name.replace(".", ""), model_name, i)), "PNG")
+
 
 def generate_from_testset(device, model_list):
     for model_name in model_list:
@@ -124,8 +200,8 @@ def generate_from_testset(device, model_list):
         try:
             os.makedirs(os.path.join("generator", model_name))
         except:
-            print("generate folder exists, so plot is overwritten")
-
+            print("'generate' folder exists, so plot is overwritten")
+        model.eval()
         with torch.set_grad_enabled(False):
             for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(
                     tqdm(dataloader_test, "Visualization")):
@@ -211,15 +287,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch')
     parser.add_argument('modelnames', nargs='+', help='model names to generate from')
     parser.add_argument('--nocuda', help='Disable CUDA', action='store_true')
-    parser.add_argument('--onlygenerate', help='Only generate, no sanity check', action='store_true')
-    parser.add_argument('--onlysanity', help='Only sanity check, no generation', action='store_true')
-    parser.add_argument('--makegraph', help='Draw graph', action='store_true')
+    parser.add_argument('--generate', help='Generate from test set', action='store_true')
+    parser.add_argument('--sanity', help='Only sanity check, no generation', action='store_true')
     parser.add_argument('--saliencymap', help='Draw saliency map', action='store_true')
+    parser.add_argument('--frompng', help='Generate images from various models to one sketch', action='store_true')
+    parser.add_argument('--multiple', help='Generate multiple images from test set for each sketch', action='store_true')
+    parser.add_argument('--batchsize', type=int, default=50,
+                        help='Batch size to use')
     args = parser.parse_args()
     device = None
-
-    if args.makegraph:
-        visualize_graph(args.modelnames)
 
     if not args.nocuda and torch.cuda.is_available():
         device = torch.device('cuda')
@@ -233,16 +309,18 @@ if __name__ == "__main__":
         print("No model name specified in command line arguments. Will use hard-coded mode list...")
         model_list = ["default_0710_0g"]
 
+    if args.multiple:
+        generate_multiple_for_one(device, model_list[0], args)
 
     if args.saliencymap:
         saliency_map(device, model_list)
 
-    if args.onlygenerate:
+    elif args.generate:
         generate_from_testset(device, model_list)
+    elif args.sanity:
+        sanity_check(device, model_list)
+    elif args.frompng:
+        generate_from_image('2325150230_2.png', model_list)
     else:
-        if args.onlysanity:
-            sanity_check(device, model_list)
-        else:
-            sanity_check(device, model_list)
-            generate_from_testset(device, model_list)
+        generate_from_testset(device, model_list)
 
