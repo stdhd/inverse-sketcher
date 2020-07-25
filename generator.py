@@ -158,7 +158,6 @@ def generate_from_testset(device, model_list):
                         fig, axes = plt.subplots(nrows=3, ncols=3)
                     if i == batch_inputs.shape[0]:
                         plt.close(fig)
-                break
 
 
 def sanity_check(device, model_list):
