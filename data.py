@@ -195,8 +195,8 @@ class ImageDataSet(Dataset):
                 sketch = (1 - sketch)
 
             # Add noise
-            image += self.noise_factor * torch.rand_like(image)
-            sketch += self.noise_factor * torch.rand_like(sketch)
+            image += self.noise_factor * torch.randn_like(image)
+            sketch += self.noise_factor * torch.randn_like(sketch)
 
             #trans = torchvision.transforms.ToPILImage()
             #trans(image).show()
