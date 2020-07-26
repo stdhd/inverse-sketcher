@@ -94,7 +94,7 @@ class ImageDataSet(Dataset):
                                     path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("_")[0] + ".png")
                                 elif "flickr" in path_sketch:
                                     path_real = os.path.join(self.__real_dir, classfolder.name, file.name.split("_")[0] + ".png")
-                                elif "edges2shoe" in path_sketch:
+                                elif "edges2shoes" in path_sketch:
                                     path_real = os.path.join(self.__real_dir, classfolder.name, file.name)
                                 else:
                                     raise(RuntimeError("Unknown dataset {}".format(self.__sketch_dir.split("/")[1])))
@@ -119,8 +119,8 @@ class ImageDataSet(Dataset):
                                     #Make the background pixels black and brushstroke pixels white
                                     if sub:
                                         sketch = (1 - sketch)
-                                    image += self.noise_factor * torch.rand_like(image)
-                                    sketch += self.noise_factor * torch.rand_like(sketch)
+                                    image += self.noise_factor * torch.randn_like(image)
+                                    sketch += self.noise_factor * torch.randn_like(sketch)
                                     self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name], image, sketch))
                                     if self.only_one_sample:
                                         self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name], image, sketch))
@@ -196,8 +196,8 @@ class ImageDataSet(Dataset):
                 sketch = (1 - sketch)
 
             # Add noise
-            image += self.noise_factor * torch.rand_like(image)
-            sketch += self.noise_factor * torch.rand_like(sketch)
+            image += self.noise_factor * torch.randn_like(image)
+            sketch += self.noise_factor * torch.randn_like(sketch)
 
             #trans = torchvision.transforms.ToPILImage()
             #trans(image).show()
