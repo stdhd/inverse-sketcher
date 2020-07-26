@@ -226,6 +226,12 @@ def _compute_statistics_of_path(path, model, batch_size, dims, cuda):
     else:
         path = pathlib.Path(path)
         files = list(path.glob('*.jpg')) + list(path.glob('*.png'))
+        print(len(files))
+        if not len(files):
+            folders = [os.path.join(path, f) for f in os.listdir(path)]
+            for folder in folders:
+                files += list(pathlib.Path(folder).glob('*.jpg')) + list(pathlib.Path(folder).glob('*.png'))
+            print(len(files))
         m, s = calculate_activation_statistics(files, model, batch_size,
                                                dims, cuda)
 

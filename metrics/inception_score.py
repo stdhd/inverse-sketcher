@@ -4,6 +4,7 @@ from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as F
 import torch.utils.data
+from tqdm import tqdm, trange
 
 from torchvision.models.inception import inception_v3
 
@@ -28,12 +29,10 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
         if torch.cuda.is_available():
             print("WARNING: You have a CUDA device, so you should probably set cuda=True")
         dtype = torch.FloatTensor
-
     # Set up dataloader
     dataloader = torch.utils.data.DataLoader(imgs, batch_size=batch_size)
-
     # Load inception model
-    inception_model = inception_v3(pretrained=True, transform_input=False, ).type(dtype)
+    inception_model = inception_v3(pretrained=True, transform_input=False, init_weights=False ).type(dtype)
     inception_model.eval();
     up = nn.Upsample(size=(299, 299), mode='bilinear').type(dtype)
     def get_pred(x):
@@ -45,7 +44,7 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
     # Get predictions
     preds = np.zeros((N, 1000))
 
-    for i, (batch, labl) in enumerate(dataloader, 0):
+    for i, (batch, labl) in tqdm(enumerate(dataloader, 0)):
         batch = batch.type(dtype)
         batchv = Variable(batch)
         batch_size_i = batch.size()[0]
@@ -55,7 +54,7 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
     # Now compute the mean kl-div
     split_scores = []
 
-    for k in range(splits):
+    for k in trange(splits):
         part = preds[k * (N // splits): (k+1) * (N // splits), :]
         py = np.mean(part, axis=0)
         scores = []
