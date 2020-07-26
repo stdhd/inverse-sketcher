@@ -139,7 +139,8 @@ def generate_multiple_for_one(device, model_name, args):
             batch_conditions = batch_conditions.to(device)
 
             for i in range(batch_conditions.shape[0]):
-                save_image(batch_conditions[i], os.path.join(save_path, 'sk_img_b{}_i{}.png'.format(batch_no, i)))
+
+                save_image(1-batch_conditions[i], os.path.join(save_path, 'sk_img_b{}_i{}.png'.format(batch_no, i)))
 
             for j in range(5):
                 gauss_samples = torch.randn(batch_inputs.shape[0],
@@ -215,7 +216,7 @@ def generate_from_testset(device, model_list):
                 for i in range(batch_inputs.shape[0]):
 
 
-                    condition_image = transforms.ToPILImage()(batch_conditions[i].cpu().detach()).convert('L')
+                    condition_image = transforms.ToPILImage()(1 - batch_conditions[i].cpu().detach()).convert('L')
                     generated_image = transforms.ToPILImage()(batch_output[i].cpu().detach()).convert("RGB")
                     original = transforms.ToPILImage()(batch_inputs[i].cpu().detach()).convert("RGB")
                     axes[i % 3, 0].imshow(condition_image, cmap='gray')
