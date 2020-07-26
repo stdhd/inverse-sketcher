@@ -118,8 +118,8 @@ class ImageDataSet(Dataset):
                                     #Make the background pixels black and brushstroke pixels white
                                     if sub:
                                         sketch = (1 - sketch)
-                                    image += self.noise_factor * torch.rand_like(image)
-                                    sketch += self.noise_factor * torch.rand_like(sketch)
+                                    image += self.noise_factor * torch.randn_like(image)
+                                    sketch += self.noise_factor * torch.randn_like(sketch)
                                     self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name], image, sketch))
                                     if self.only_one_sample:
                                         self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name], image, sketch))
