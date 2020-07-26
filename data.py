@@ -37,7 +37,7 @@ class ImageMetaData(object):
 
 class ImageDataSet(Dataset):
 
-    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.002, load_on_request=False):
+    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.002, load_on_request=False, bw=False):
         """
         root_dir: directory of the dataset
         include_unk: Whether to include the unknown class
@@ -56,6 +56,7 @@ class ImageDataSet(Dataset):
         self.load_on_request = load_on_request
         self.noise_factor = noise_factor
         self.load_on_request = load_on_request
+        self.bw = bw
         self.get_class_numbers()
         self.__process_meta()
 
@@ -203,6 +204,9 @@ class ImageDataSet(Dataset):
         else:
             meta = self.__meta[idx]
             image, sketch = meta.get_images()
+            if self.bw:
+                image = torch.mean(image, dim=0)
+                image = torch.stack([image[::2, ::2], image[1::2, ::2], image[::2, 1::2], image[1::2, 1::2],], dim = 0)
 
         return sketch, image, meta.get_class()
 

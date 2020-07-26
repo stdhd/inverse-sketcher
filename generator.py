@@ -186,8 +186,8 @@ def generate_from_testset(device, model_list):
         print('Generate from model {}'.format(model_name))
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
 
-        __, dataloader_test, ___, test_split = train.create_dataloaders(
-            params["data_path"], #"dataset/flickr/",
+        dataloader_train, dataloader_test, ___, test_split = train.create_dataloaders(
+            "dataset/edges2shoes/", #params["data_path"], #
             params["batch_size"],
             params["test_ratio"],
             only_classes=params.get("only_classes", None),
@@ -323,4 +323,3 @@ if __name__ == "__main__":
         generate_from_image('2325150230_2.png', model_list)
     else:
         generate_from_testset(device, model_list)
-

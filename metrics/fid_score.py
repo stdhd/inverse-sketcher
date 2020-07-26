@@ -102,6 +102,11 @@ def get_activations(files, model, batch_size=50, dims=2048,
         batch_size = len(files)
 
     pred_arr = np.empty((len(files), dims))
+    noise = 0
+    if "photo" in str(files[0]) :
+        #noise = 0.002
+        print(noise)
+
 
     for i in tqdm(range(0, len(files), batch_size)):
         if verbose:
@@ -118,6 +123,7 @@ def get_activations(files, model, batch_size=50, dims=2048,
         images /= 255
 
         batch = torch.from_numpy(images).type(torch.FloatTensor)
+        batch = batch + torch.randn(batch.shape) * noise
         if cuda:
             batch = batch.cuda()
 
