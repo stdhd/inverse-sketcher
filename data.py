@@ -37,7 +37,7 @@ class ImageMetaData(object):
 
 class ImageDataSet(Dataset):
 
-    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.005, load_on_request=False, bw=False):
+    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.002, load_on_request=False, bw=False):
         """
         root_dir: directory of the dataset
         include_unk: Whether to include the unknown class
@@ -113,9 +113,10 @@ class ImageDataSet(Dataset):
                                     if not self.__transform is None:
                                         sketch = self.__transform(sketch)
                                         image = self.__transform(image)
+
                                     image = tensor_transform(image)
                                     sketch = tensor_transform(sketch)
-
+                                    sketch = (sketch - torch.min(sketch)) / (torch.max(sketch) - torch.min(sketch))
                                     #Make the background pixels black and brushstroke pixels white
                                     if sub:
                                         sketch = (1 - sketch)
@@ -190,7 +191,7 @@ class ImageDataSet(Dataset):
             tensor_transform = torchvision.transforms.ToTensor()
             image = tensor_transform(image)
             sketch = tensor_transform(sketch)
-
+            sketch = (sketch - torch.min(sketch)) / (torch.max(sketch) - torch.min(sketch))
             #Make the background pixels black and brushstroke pixels white
             if sub:
                 sketch = (1 - sketch)
