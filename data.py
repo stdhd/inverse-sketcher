@@ -37,7 +37,7 @@ class ImageMetaData(object):
 
 class ImageDataSet(Dataset):
 
-    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.002, load_on_request=False, bw=False):
+    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.005, load_on_request=False, bw=False):
         """
         root_dir: directory of the dataset
         include_unk: Whether to include the unknown class
@@ -119,8 +119,8 @@ class ImageDataSet(Dataset):
                                     #Make the background pixels black and brushstroke pixels white
                                     if sub:
                                         sketch = (1 - sketch)
-                                    image += self.noise_factor * torch.randn_like(image)
-                                    sketch += self.noise_factor * torch.randn_like(sketch)
+                                    image += self.noise_factor * torch.rand_like(image)
+                                    sketch += self.noise_factor * torch.rand_like(sketch)
                                     self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name], image, sketch))
                                     if self.only_one_sample:
                                         self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name], image, sketch))
@@ -196,8 +196,8 @@ class ImageDataSet(Dataset):
                 sketch = (1 - sketch)
 
             # Add noise
-            image += self.noise_factor * torch.randn_like(image)
-            sketch += self.noise_factor * torch.randn_like(sketch)
+            image += self.noise_factor * torch.rand_like(image)
+            sketch += self.noise_factor * torch.rand_like(sketch)
 
             #trans = torchvision.transforms.ToPILImage()
             #trans(image).show()
