@@ -65,7 +65,7 @@ def get_transform():
     return transforms.Resize((64, 64))
 
 
-def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None, only_one_sample=False, load_on_request=False, add_data=None, p=1):
+def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_classes=None, only_one_sample=False, load_on_request=False, add_data=None, p=1, bw=False, color=False):
     """
     Create data loaders from ImageDataSet according parameters. If split is provided, it is used by the data loader.
     :param data_path: path of root directory of data set, while directories 'photo' and 'sketch' are sub directories
@@ -77,18 +77,20 @@ def create_dataloaders(data_path, batch_size, test_ratio, split=None, only_class
     :param num_workers: number of workers threads for loading sketches and images from drive
     :return: train and test dataloaders and train and test split
     """
+    if bw and color:
+        raise(RuntimeError("Can't do both black and white and coloring at the same time."))
     if only_one_sample:
         test_ratio = 0.5
         batch_size = 1
 
-    data_set = data.ImageDataSet(root_dir=data_path, transform=get_transform(), only_classes=only_classes, only_one_sample=only_one_sample, load_on_request=load_on_request)
+    data_set = data.ImageDataSet(root_dir=data_path, transform=get_transform(), only_classes=only_classes, only_one_sample=only_one_sample, load_on_request=load_on_request, bw=bw, color=color)
     if split is None:
         perm = torch.randperm(len(data_set))
         train_split, test_split = perm[:math.ceil(len(data_set) * (1-test_ratio))], perm[math.ceil(len(data_set) * (1-test_ratio)):]
     else:
         train_split, test_split = split[0], split[1]
     if add_data:
-        data_set_add = data.ImageDataSet(root_dir=add_data, transform=get_transform(), only_classes=only_classes, only_one_sample=only_one_sample, load_on_request=load_on_request)
+        data_set_add = data.ImageDataSet(root_dir=add_data, transform=get_transform(), only_classes=only_classes, only_one_sample=only_one_sample, load_on_request=load_on_request, bw=bw, color=color)
         dataloader_train = data.CompositeDataloader(DataLoader(Subset(data_set, train_split), batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True),
                                                     DataLoader(data_set_add, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True),
                                                     p=p,
@@ -193,8 +195,8 @@ def validate(model, dataloader_test):
     model.train()
     return val_loss
 
-def train_ae(encoder_sizes, decoder_sizes, train_loader, num_epochs=30):
-    AE = AutoEncoder(encoder_sizes, decoder_sizes).to(device)
+def train_ae(encoder_sizes, decoder_sizes, train_loader, num_epochs=0, bw=False):
+    AE = AutoEncoder(encoder_sizes, decoder_sizes, bw=bw).to(device)
     optimizer = torch.optim.Adam(AE.parameters(), lr=0.0005, weight_decay=3e-6)
     for epoch in tqdm(range(num_epochs), "Encoder pretraining"):
         epoch_loss = 0
@@ -263,7 +265,9 @@ if __name__ == "__main__":
                                                                                             only_one_sample=params.get('only_one_sample', False),
                                                                                             load_on_request=args.nopreload,
                                                                                             add_data=params.get("add_data"),
-                                                                                            p=p)
+                                                                                            p=p,
+                                                                                            bw=params["model_params"].get("bw"),
+                                                                                            color=params["model_params"].get("color"))
         else:
             # Init new training with new split
             model = get_model(params)
@@ -276,7 +280,9 @@ if __name__ == "__main__":
                                                                                             only_one_sample=params.get('only_one_sample', False),
                                                                                             load_on_request=args.nopreload,
                                                                                             add_data=params.get("add_data"),
-                                                                                            p=params.get("prob_data1"))
+                                                                                            p=params.get("prob_data1"),
+                                                                                            bw=params["model_params"].get("bw"),
+                                                                                            color=params["model_params"].get("color"))
             split = (train_split, test_split)
         if params.get("half_precision", False):
             model.half()
@@ -287,13 +293,15 @@ if __name__ == "__main__":
         pp.pprint(params)
         if params["model_params"].get("pretrain_cond", False) and not params.get("load_model", False):
             del model.cond_net
-            model.cond_net = train_ae(params["model_params"]["encoder_sizes"], params["model_params"]["decoder_sizes"], dataloader_train)
+            model.cond_net = train_ae(params["model_params"]["encoder_sizes"], params["model_params"]["decoder_sizes"], dataloader_train, bw = params['model_params'].get("bw"))
         for e in range(params["n_epochs"]):
             epoch += 1
             epoch_loss = 0
             for batch, (sketch, real, label) in enumerate(tqdm(dataloader_train)):
                 optimizer.zero_grad()
                 sketch, real, label = sketch.to(device), real.to(device), label.to(device)
+                print(torch.max(sketch[:,0]), torch.max(real[:,0]), torch.max(real[:,1]))
+                print(torch.min(sketch[:,0]), torch.min(real[:,0]), torch.min(real[:,1]))
                 if params.get("half_precision", False):
                     sketch, real = sketch.half(), real.half()
                 gauss_output = model(real, sketch)

@@ -4,11 +4,13 @@ from sklearn.model_selection import KFold
 import logging
 import os
 import torch
-from PIL import Image
+from PIL import Image, ImageCms
 import torchvision
 from tqdm import tqdm
 import numpy as np
 from random import uniform
+from skimage import io, color
+
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ class ImageMetaData(object):
 
 class ImageDataSet(Dataset):
 
-    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.002, load_on_request=False, bw=False):
+    def __init__(self, root_dir, transform=None, return_path=False, only_classes=None, only_one_sample=False, noise_factor=0.002, load_on_request=False, bw=False, color=False):
         """
         root_dir: directory of the dataset
         include_unk: Whether to include the unknown class
@@ -57,6 +59,11 @@ class ImageDataSet(Dataset):
         self.noise_factor = noise_factor
         self.load_on_request = load_on_request
         self.bw = bw
+        self.color = color
+        self.profileRGB = ImageCms.createProfile("sRGB")
+        self.profileLab = ImageCms.createProfile("LAB")
+        self.scale = (25.6, 11.2, 16.8)
+        self.bias =  (47.5, 2.4, 7.4)
         self.get_class_numbers()
         self.__process_meta()
 
@@ -115,12 +122,21 @@ class ImageDataSet(Dataset):
                                         image = self.__transform(image)
                                     image = tensor_transform(image)
                                     sketch = tensor_transform(sketch)
+                                    sketch = (sketch - torch.min(sketch))/(torch.max(sketch) - torch.min(sketch))
 
+                                    if self.color:
+                                        image = image.numpy()
+
+                                        image = np.transpose(image, (1,2,0))
+                                        if image.shape[2] != 3:
+                                            image = np.stack([image[:,:,0]]*3, axis=2)
+                                        image = color.rgb2lab(image).transpose((2, 0, 1))
+                                        image = torch.Tensor(image)
                                     #Make the background pixels black and brushstroke pixels white
                                     if sub:
                                         sketch = (1 - sketch)
-                                    image += self.noise_factor * torch.randn_like(image)
-                                    sketch += self.noise_factor * torch.randn_like(sketch)
+                                    image += self.noise_factor * torch.rand_like(image)
+                                    sketch += self.noise_factor * torch.rand_like(sketch)
                                     self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name], image, sketch))
                                     if self.only_one_sample:
                                         self.__meta.append(ImageMetaData(path_sketch, path_real, self.__class_dict[classfolder.name], image, sketch))
@@ -180,7 +196,6 @@ class ImageDataSet(Dataset):
                 sketch = sketch.convert("L")
                 sub = True
                 #sub = "SketchyDatabase" in path_sketch
-
             image = Image.open(path_real)
 
             if not self.__transform is None:
@@ -190,15 +205,30 @@ class ImageDataSet(Dataset):
             tensor_transform = torchvision.transforms.ToTensor()
             image = tensor_transform(image)
             sketch = tensor_transform(sketch)
+            #sketch = (sketch - torch.min(sketch))/(torch.max(sketch) - torch.min(sketch))
+            if self.color:
+                image = image.numpy()
 
+                image = np.transpose(image, (1,2,0))
+                if image.shape[2] != 3:
+                    image = np.stack([image[:,:,0]]*3, axis=2)
+                image = color.rgb2lab(image).transpose((2, 0, 1))
+                for i in range(3):
+                    image[i] = (image[i] - self.bias[i]) / self.scale[i]
+                image = torch.Tensor(image)
             #Make the background pixels black and brushstroke pixels white
             if sub:
                 sketch = (1 - sketch)
 
             # Add noise
-            image += self.noise_factor * torch.randn_like(image)
-            sketch += self.noise_factor * torch.randn_like(sketch)
+            image += self.noise_factor * torch.rand_like(image)
+            sketch += self.noise_factor * torch.rand_like(sketch)
+            if self.bw:
+                image = torch.mean(image, dim=0)
+                image = torch.stack([image[::2, ::2], image[1::2, ::2], image[::2, 1::2], image[1::2, 1::2],], dim = 0)
+            if self.color:
 
+                return image[0].unsqueeze(0), image[1:], meta.get_class()
             #trans = torchvision.transforms.ToPILImage()
             #trans(image).show()
         else:
@@ -207,7 +237,8 @@ class ImageDataSet(Dataset):
             if self.bw:
                 image = torch.mean(image, dim=0)
                 image = torch.stack([image[::2, ::2], image[1::2, ::2], image[::2, 1::2], image[1::2, 1::2],], dim = 0)
-
+            if self.color:
+                return image[0].unsqueeze(0), image[1:], meta.get_class()
         return sketch, image, meta.get_class()
 
 

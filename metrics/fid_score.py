@@ -102,10 +102,7 @@ def get_activations(files, model, batch_size=50, dims=2048,
         batch_size = len(files)
 
     pred_arr = np.empty((len(files), dims))
-    noise = 0
-    if "photo" in str(files[0]) :
-        #noise = 0.002
-        print(noise)
+
 
 
     for i in tqdm(range(0, len(files), batch_size)):
@@ -121,9 +118,8 @@ def get_activations(files, model, batch_size=50, dims=2048,
         # Reshape to (n_images, 3, height, width)
         images = images.transpose((0, 3, 1, 2))
         images /= 255
-
-        batch = torch.from_numpy(images).type(torch.FloatTensor)
-        batch = batch + torch.randn(batch.shape) * noise
+        #batch = torch.from_numpy(images).type(torch.FloatTensor)
+        #batch = torch.mean(batch, dim=1, keepdims=True).repeat(1, 3, 1, 1)
         if cuda:
             batch = batch.cuda()
 
