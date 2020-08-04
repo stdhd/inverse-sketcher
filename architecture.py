@@ -551,69 +551,6 @@ class Flatten(nn.Module):
         return x.view(x.shape[0], -1)
 
 
-class SubnetConstructorFC(nn.Module):
-    """This class constructs a subnet for the inner parts of the GLOWCouplingBlocks
-    as well as the condition preprocessor.
-    size_in: input size of the subnet
-    size: output size of the subnet
-    internal_size: hidden size of the subnet. If None, set to 2*size
-    dropout: dropout chance of the subnet
-    """
-
-    def __init__(self, num_layers, size_in, size_out, internal_size=None, dropout=0.0):
-        super().__init__()
-        if internal_size is None:
-            internal_size = size_out * 2
-        if num_layers < 1:
-            raise (ValueError("Subnet size has to be 1 or greater"))
-        self.layers = []
-        for n in range(num_layers):
-            input_dim, output_dim = internal_size, internal_size
-            if n == 0:
-                input_dim = size_in
-            if n == num_layers - 1:
-                output_dim = size_out
-            self.layers.append(nn.Linear(input_dim, output_dim))
-            if n < num_layers - 1:
-                self.layers.append(nn.Dropout(p=dropout))
-                self.layers.append(nn.ReLU())
-        self.layers = nn.ModuleList(self.layers)
-
-    def forward(self, x):
-        for l in self.layers:
-            x = l(x)
-        return x
-
-
-class SubnetConstructorConv(nn.Module):
-
-    def __init__(self, num_layers, size_in, in_channels, hidden_channels, out_channels, stride=1, conv_size=3,
-                 dropout=0.0):
-        super().__init__()
-        if num_layers < 1:
-            raise (ValueError("Subnet size has to be 1 or greater"))
-        self.layers = []
-        ch1 = in_channels
-        pad_size = self.get_pad_size(size_in, size_in, stride, conv_size)
-        for n in range(num_layers - 1):
-            self.layers.append(nn.Conv2d(ch1, out_channels, conv_size, padding=pad_size, stride=stride))
-            self.layers.append(nn.ReLU())
-            self.layers.append(nn.Dropout(dropout))
-            ch1 = out_channels
-        self.layers.append(nn.Conv2d(ch1, out_channels, conv_size, padding=pad_size, stride=stride))
-        self.layers = nn.ModuleList(self.layers)
-
-    def get_pad_size(self, size_out, size_in, stride, conv_size):
-        # size_out == size_in
-        # width == height
-        return int((size_in / (stride) + conv_size - size_in) // 2)
-
-    def forward(self, x):
-        for l in self.layers:
-            x = l(x)
-        return x
-
-
 class LearnedActNorm(nn.Module):
     '''Learned transformation according to y = Mx + b, with invertible
     matrix M.'''

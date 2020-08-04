@@ -120,6 +120,7 @@ class ImageDataSet(Dataset):
                                     if not self.__transform is None:
                                         sketch = self.__transform(sketch)
                                         image = self.__transform(image)
+
                                     image = tensor_transform(image)
                                     sketch = tensor_transform(sketch)
                                     sketch = (sketch - torch.min(sketch))/(torch.max(sketch) - torch.min(sketch))
@@ -131,6 +132,8 @@ class ImageDataSet(Dataset):
                                         if image.shape[2] != 3:
                                             image = np.stack([image[:,:,0]]*3, axis=2)
                                         image = color.rgb2lab(image).transpose((2, 0, 1))
+                                        for i in range(3):
+                                            image[i] = (image[i] - self.bias[i]) / self.scale[i]
                                         image = torch.Tensor(image)
                                     #Make the background pixels black and brushstroke pixels white
                                     if sub:
@@ -205,7 +208,7 @@ class ImageDataSet(Dataset):
             tensor_transform = torchvision.transforms.ToTensor()
             image = tensor_transform(image)
             sketch = tensor_transform(sketch)
-            #sketch = (sketch - torch.min(sketch))/(torch.max(sketch) - torch.min(sketch))
+            sketch = (sketch - torch.min(sketch))/(torch.max(sketch) - torch.min(sketch))
             if self.color:
                 image = image.numpy()
 
@@ -215,8 +218,7 @@ class ImageDataSet(Dataset):
                 image = color.rgb2lab(image).transpose((2, 0, 1))
                 for i in range(3):
                     image[i] = (image[i] - self.bias[i]) / self.scale[i]
-                image = torch.Tensor(image)
-            #Make the background pixels black and brushstroke pixels white
+                image = torch.Tensor(image)            #Make the background pixels black and brushstroke pixels white
             if sub:
                 sketch = (1 - sketch)
 
@@ -227,7 +229,6 @@ class ImageDataSet(Dataset):
                 image = torch.mean(image, dim=0)
                 image = torch.stack([image[::2, ::2], image[1::2, ::2], image[::2, 1::2], image[1::2, 1::2],], dim = 0)
             if self.color:
-
                 return image[0].unsqueeze(0), image[1:], meta.get_class()
             #trans = torchvision.transforms.ToPILImage()
             #trans(image).show()

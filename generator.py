@@ -17,6 +17,8 @@ from torchvision.utils import save_image
 import PIL
 from skimage import io, color
 
+scale = (25.6, 11.2, 16.8)
+bias =  (47.5, 2.4, 7.4)
 
 def load_trained_model(folder):
     """
@@ -141,7 +143,8 @@ def generate_multiple_for_one(device, model_name, args):
             batch_conditions = batch_conditions.to(device)
 
             for i in range(batch_conditions.shape[0]):
-                save_image(batch_conditions[i], os.path.join(save_path, 'sk_img_b{}_i{}.png'.format(batch_no, i)))
+
+                save_image(1-batch_conditions[i], os.path.join(save_path, 'sk_img_b{}_i{}.png'.format(batch_no, i)))
 
             for j in range(5):
                 gauss_samples = torch.randn(batch_inputs.shape[0],
@@ -232,18 +235,21 @@ def generate_from_testset(device, model_list):
                     true[:,:,1::2,1::2] = batch_inputs[:,3,:,:].unsqueeze(1)
                 elif params["model_params"].get("color"):
                     gen = torch.cat((batch_conditions, batch_output), dim=1).cpu().data.numpy()
+                    for i in range(3):
+                        gen[:, i] = gen[:, i] * scale[i] + bias[i]
+
+                    gen[:, 1:] = gen[:, 1:].clamp_(-128, 128)
+                    gen[:, 0] = gen[:, 0].clamp_(0, 100.)
                     gen = torch.stack([torch.from_numpy(color.lab2rgb(np.transpose(l, (1, 2, 0))).transpose(2, 0, 1)) for l in gen], dim=0)
+                    for i in range(3):
+                        true[:, i] = true[:, i] * scale[i] + bias[i]
                     true = torch.cat((batch_conditions, batch_inputs.to(device)), dim=1).cpu().data.numpy()
                     true = torch.stack([torch.from_numpy(color.lab2rgb(np.transpose(l, (1, 2, 0))).transpose(2, 0, 1)) for l in true], dim=0)
-                    #gen[:, 0] = gen[:, 0].clamp_(0., 100.)
-                    #gen[:, 1:] = gen[:, 1:].clamp_(-128, 128)
-                    #true[:, 0] = true[:, 0].clamp_(0., 100.)
-                    #true[:, 1:] = true[:, 1:].clamp_(-128, 128)
+
 
                 fig, axes = plt.subplots(nrows=3, ncols=3)
                 for i in range(batch_inputs.shape[0]):
-
-                    condition_image = transforms.ToPILImage()(batch_conditions[i].cpu().detach()).convert('L')
+                    condition_image = transforms.ToPILImage()(1 - batch_conditions[i].cpu().detach()).convert('L')
                     generated_image = transforms.ToPILImage()(gen[i].cpu().detach()).convert("RGB")
                     original = transforms.ToPILImage()(true[i].cpu().detach()).convert("RGB")
                     axes[i % 3, 0].imshow(condition_image, cmap='gray')
@@ -311,8 +317,6 @@ def generate_combined(device, model_list):
     print("Coloring Images")
     model, split, params = load_trained_model(os.path.join("saved_models", model_list[1]))
     model.to(device)
-    scale = (25.6, 11.2, 16.8)
-    bias =  (47.5, 2.4, 7.4)
     model.eval()
     with torch.set_grad_enabled(False):
         for batch_no, (batch_inputs, batch_conditions, old_cond) in enumerate(
@@ -339,8 +343,6 @@ def generate_combined(device, model_list):
             gen = torch.cat((batch_conditions, batch_output), dim=1)
             for i in range(3):
                 gen[:, i] = gen[:, i] * scale[i] + bias[i]
-            print(torch.max(gen[:,0]), torch.max(gen[:,1]), torch.max(gen[:,2]))
-            print(torch.min(gen[:,0]), torch.min(gen[:,1]), torch.min(gen[:,2]))
 
             gen[:, 1:] = gen[:, 1:].clamp_(-128, 128)
             gen[:, 0] = gen[:, 0].clamp_(0, 100.)

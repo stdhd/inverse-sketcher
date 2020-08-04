@@ -28,6 +28,9 @@ parser.add_argument('--combine', help="Whether to combine a bw and color model",
 parser.add_argument('--filecount', type=int, default=-1,
                     help='Number of files to create max. -1 (default) means no limit.')
 
+scale = (25.6, 11.2, 16.8)
+bias =  (47.5, 2.4, 7.4)
+
 
 def generate_pngs(device, model_name, args):
     model, split, params = load_trained_model(os.path.join("saved_models", model_name))
@@ -72,6 +75,15 @@ def generate_pngs(device, model_name, args):
                 gen[:,:,1::2,::2] = batch_output[:,1,:,:].unsqueeze(1)
                 gen[:,:,::2,1::2] = batch_output[:,2,:,:].unsqueeze(1)
                 gen[:,:,1::2,1::2] = batch_output[:,3,:,:].unsqueeze(1)
+            elif params["model_params"].get("color"):
+                gen = torch.cat((batch_conditions, batch_output), dim=1).cpu().data.numpy()
+                for i in range(3):
+                    gen[:, i] = gen[:, i] * scale[i] + bias[i]
+
+                gen[:, 1:] = gen[:, 1:].clamp_(-128, 128)
+                gen[:, 0] = gen[:, 0].clamp_(0, 100.)
+                gen = torch.stack([torch.from_numpy(color.lab2rgb(np.transpose(l, (1, 2, 0))).transpose(2, 0, 1)) for l in gen], dim=0)
+
             for i in range(gen.shape[0]):
                 save_image(gen[i], os.path.join(save_path, 'img_b{}_i{}.png'.format(batch_no, i)))
                 if count >= args.filecount and not args.filecount == -1:
@@ -223,6 +235,7 @@ if __name__ == "__main__":
         if not args.nois:
             dataset = torchvision.datasets.ImageFolder(root="/".join(path.split("/")[:-1]),
                                                        transform=torchvision.transforms.ToTensor())
+            #Calculate IS of dataset as reference (generated IS should not exceed dataset IS)
             #dataset = torchvision.datasets.ImageFolder(root=os.path.join(reference_path),
             #                                           transform=torchvision.transforms.ToTensor())
             print("Calculating inception score for Model {}...".format(model_name))

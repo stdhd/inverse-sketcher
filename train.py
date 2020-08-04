@@ -195,7 +195,7 @@ def validate(model, dataloader_test):
     model.train()
     return val_loss
 
-def train_ae(encoder_sizes, decoder_sizes, train_loader, num_epochs=0, bw=False):
+def train_ae(encoder_sizes, decoder_sizes, train_loader, num_epochs=1, bw=False):
     AE = AutoEncoder(encoder_sizes, decoder_sizes, bw=bw).to(device)
     optimizer = torch.optim.Adam(AE.parameters(), lr=0.0005, weight_decay=3e-6)
     for epoch in tqdm(range(num_epochs), "Encoder pretraining"):
@@ -300,8 +300,6 @@ if __name__ == "__main__":
             for batch, (sketch, real, label) in enumerate(tqdm(dataloader_train)):
                 optimizer.zero_grad()
                 sketch, real, label = sketch.to(device), real.to(device), label.to(device)
-                print(torch.max(sketch[:,0]), torch.max(real[:,0]), torch.max(real[:,1]))
-                print(torch.min(sketch[:,0]), torch.min(real[:,0]), torch.min(real[:,1]))
                 if params.get("half_precision", False):
                     sketch, real = sketch.half(), real.half()
                 gauss_output = model(real, sketch)
