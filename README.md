@@ -32,6 +32,9 @@ dataset
        |image files...
      |...
      |classN
+  |dataset2
+    |photo
+      |...
 ```
  <summary>Click to expand!</summary>
  </details>
