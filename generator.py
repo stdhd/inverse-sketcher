@@ -9,6 +9,11 @@ import numpy as np
 import scipy.stats
 from tqdm import tqdm
 from torchvision.utils import save_image
+import PIL
+from skimage import io, color
+
+scale = (25.6, 11.2, 16.8)
+bias =  (47.5, 2.4, 7.4)
 
 
 def load_trained_model(folder):
@@ -155,13 +160,15 @@ def generate_from_testset(device, model_list):
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
 
         dataloader_train, dataloader_test, ___, test_split = train.create_dataloaders(
-            "dataset/edges2shoes/", #params["data_path"], #
+            params["data_path"], #"dataset/edges2shoes/",
             params["batch_size"],
             params["test_ratio"],
             only_classes=params.get("only_classes", None),
             split=split,
             only_one_sample=params.get("only_one_sample", False),
-            load_on_request=True
+            load_on_request=True,
+            bw=params["model_params"].get("bw"),
+            color=params["model_params"].get("color")
         )
         model.to(device)
 
@@ -179,16 +186,43 @@ def generate_from_testset(device, model_list):
                     device)
                 batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
                 subset = 0
+                gen = batch_output
+                true = batch_inputs
+
+                if params["model_params"].get("bw"):
+                    gen = torch.empty(batch_output.shape[0], 1, 64, 64)
+                    true = torch.empty(batch_output.shape[0], 1, 64, 64)
+
+                    gen[:,:,::2,::2] = batch_output[:,0,:,:].unsqueeze(1)
+                    gen[:,:,1::2,::2] = batch_output[:,1,:,:].unsqueeze(1)
+                    gen[:,:,::2,1::2] = batch_output[:,2,:,:].unsqueeze(1)
+                    gen[:,:,1::2,1::2] = batch_output[:,3,:,:].unsqueeze(1)
+                    true[:,:,::2,::2] = batch_inputs[:,0,:,:].unsqueeze(1)
+                    true[:,:,1::2,::2] = batch_inputs[:,1,:,:].unsqueeze(1)
+                    true[:,:,::2,1::2] = batch_inputs[:,2,:,:].unsqueeze(1)
+                    true[:,:,1::2,1::2] = batch_inputs[:,3,:,:].unsqueeze(1)
+                elif params["model_params"].get("color"):
+                    gen = torch.cat((batch_conditions, batch_output), dim=1).cpu().data.numpy()
+                    for i in range(3):
+                        gen[:, i] = gen[:, i] * scale[i] + bias[i]
+
+                    gen[:, 1:] = gen[:, 1:].clamp_(-128, 128)
+                    gen[:, 0] = gen[:, 0].clamp_(0, 100.)
+                    gen = torch.stack([torch.from_numpy(color.lab2rgb(np.transpose(l, (1, 2, 0))).transpose(2, 0, 1)) for l in gen], dim=0)
+                    for i in range(3):
+                        true[:, i] = true[:, i] * scale[i] + bias[i]
+                    true = torch.cat((batch_conditions, batch_inputs.to(device)), dim=1).cpu().data.numpy()
+                    true = torch.stack([torch.from_numpy(color.lab2rgb(np.transpose(l, (1, 2, 0))).transpose(2, 0, 1)) for l in true], dim=0)
+
+
                 fig, axes = plt.subplots(nrows=3, ncols=3)
                 for i in range(batch_inputs.shape[0]):
-
-
                     condition_image = transforms.ToPILImage()(1 - batch_conditions[i].cpu().detach()).convert('L')
-                    generated_image = transforms.ToPILImage()(batch_output[i].cpu().detach()).convert("RGB")
-                    original = transforms.ToPILImage()(batch_inputs[i].cpu().detach()).convert("RGB")
+                    generated_image = transforms.ToPILImage()(gen[i].cpu().detach()).convert("RGB")
+                    original = transforms.ToPILImage()(true[i].cpu().detach()).convert("RGB")
                     axes[i % 3, 0].imshow(condition_image, cmap='gray')
-                    axes[i % 3, 1].imshow(generated_image)
-                    axes[i % 3, 2].imshow(original)
+                    axes[i % 3, 1].imshow(generated_image)#, cmap="gray")
+                    axes[i % 3, 2].imshow(original)#, cmap="gray")
 
                     axes[i % 3, 0].axis('off')
                     axes[i % 3, 1].axis('off')
@@ -202,6 +236,110 @@ def generate_from_testset(device, model_list):
                         fig, axes = plt.subplots(nrows=3, ncols=3)
                     if i == batch_inputs.shape[0]:
                         plt.close(fig)
+
+def generate_combined(device, model_list):
+    print('Combining bw model {} and color model {}'.format(model_list[0], model_list[1]))
+    model, split, params = load_trained_model(os.path.join("saved_models", model_list[0]))
+
+    dataloader_train, dataloader_test, ___, test_split = train.create_dataloaders(
+        params["data_path"], #"dataset/edges2shoes/",
+        params["batch_size"],
+        params["test_ratio"],
+        only_classes=params.get("only_classes", None),
+        split=split,
+        only_one_sample=params.get("only_one_sample", False),
+        load_on_request=True,
+        bw=False,
+        color=False,
+    )
+    model.to(device)
+    try:
+        os.makedirs(os.path.join("generator", "combined_" + model_list[0].split("/")[0] + "_" + model_list[1].split("/")[0]))
+    except:
+        print("'generate' folder exists, so plot is overwritten")
+    model.eval()
+    images_bw = []
+    gen_bw = []
+    orig_cond = []
+    with torch.set_grad_enabled(False):
+        for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(
+                tqdm(dataloader_test, "Visualization")):
+            batch_conditions = batch_conditions.to(device)
+            gauss_samples = torch.randn(batch_inputs.shape[0],
+                                        1 * batch_inputs.shape[2] * batch_inputs.shape[3]).to(device)
+            batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
+            gen = torch.empty(batch_output.shape[0], 1, 64, 64)
+            true = torch.empty(batch_output.shape[0], 1, 64, 64)
+
+            gen[:,:,::2,::2] = batch_output[:,0,:,:].unsqueeze(1)
+            gen[:,:,1::2,::2] = batch_output[:,1,:,:].unsqueeze(1)
+            gen[:,:,::2,1::2] = batch_output[:,2,:,:].unsqueeze(1)
+            gen[:,:,1::2,1::2] = batch_output[:,3,:,:].unsqueeze(1)
+            gen_bw.append(gen)
+            images_bw.append(batch_inputs)
+            orig_cond.append(batch_conditions)
+
+            if batch_no > 9:
+                break
+    #gen_bw, images_bw = torch.cat(gen_bw, dim = 0), torch.cat(images_bw, dim = 0)
+    print("Coloring Images")
+    model, split, params = load_trained_model(os.path.join("saved_models", model_list[1]))
+    model.to(device)
+    model.eval()
+    with torch.set_grad_enabled(False):
+        for batch_no, (batch_inputs, batch_conditions, old_cond) in enumerate(
+                tqdm(zip(images_bw, gen_bw, orig_cond), "Visualization")):
+            batch_conditions = batch_conditions.to(device)
+            gauss_samples = torch.randn(batch_inputs.shape[0],
+                                        2 * batch_inputs.shape[2] * batch_inputs.shape[3]).to(device)
+            for j in range(len(batch_conditions)):
+                image = batch_conditions[j].cpu().numpy()
+
+                image = np.transpose(image, (1,2,0))
+                if image.shape[2] != 3:
+                    image = np.stack([image[:,:,0]]*3, axis=2)
+                image = color.rgb2lab(image).transpose((2, 0, 1))
+                for i in range(3):
+                    image[i] = (image[i] - bias[i]) / scale[i]
+                image = torch.Tensor(image)
+                batch_conditions[j] = image[0].to(device)
+
+            batch_output = model(x=gauss_samples, c=batch_conditions, rev=True)
+            subset = 0
+            gen = batch_output
+            true = batch_inputs
+            gen = torch.cat((batch_conditions, batch_output), dim=1)
+            for i in range(3):
+                gen[:, i] = gen[:, i] * scale[i] + bias[i]
+
+            gen[:, 1:] = gen[:, 1:].clamp_(-128, 128)
+            gen[:, 0] = gen[:, 0].clamp_(0, 100.)
+
+            gen = gen.cpu().data.numpy()
+            gen = torch.stack([torch.from_numpy(color.lab2rgb(np.transpose(l, (1, 2, 0))).transpose(2, 0, 1)) for l in gen], dim=0)
+            subset = 0
+            fig, axes = plt.subplots(nrows=3, ncols=3)
+            for i in range(batch_inputs.shape[0]):
+
+                condition_image = transforms.ToPILImage()(old_cond[i].cpu().detach()).convert('L')
+                generated_image = transforms.ToPILImage()(gen[i].cpu().detach()).convert("RGB")
+                original = transforms.ToPILImage()(true[i].cpu().detach()).convert("RGB")
+                axes[i % 3, 0].imshow(condition_image, cmap='gray')
+                axes[i % 3, 1].imshow(generated_image)#, cmap="gray")
+                axes[i % 3, 2].imshow(original)#, cmap="gray")
+
+                axes[i % 3, 0].axis('off')
+                axes[i % 3, 1].axis('off')
+                axes[i % 3, 2].axis('off')
+                if i % 3 == 2 or i == batch_inputs.shape[0] - 1:
+                    plt.savefig(
+                        os.path.join("generator", "combined_" + model_list[0].split("/")[0] + "_" + model_list[1].split("/")[0], "out_batch{}_{}.pdf".format(batch_no, subset)),
+                        bbox_inches='tight')
+                    subset += 1
+                    plt.close(fig)
+                    fig, axes = plt.subplots(nrows=3, ncols=3)
+                if i == batch_inputs.shape[0]:
+                    plt.close(fig)
 
 
 def sanity_check(device, model_list):
@@ -261,6 +399,7 @@ if __name__ == "__main__":
     parser.add_argument('--multiple', help='Generate multiple images from test set for each sketch', action='store_true')
     parser.add_argument('--batchsize', type=int, default=50,
                         help='Batch size to use')
+    parser.add_argument('--combine', help='Whether to combine a bw and color model', action='store_true')
     args = parser.parse_args()
     device = None
 
@@ -285,5 +424,7 @@ if __name__ == "__main__":
         generate_from_testset(device, model_list)
     elif args.sanity:
         sanity_check(device, model_list)
+    elif args.combine:
+        generate_combined(device, model_list)
     else:
         generate_from_testset(device, model_list)

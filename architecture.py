@@ -11,11 +11,15 @@ from autoencoder import AutoEncoder
 def get_model_by_params(params):
     if params['architecture'].lower() == "glow":
         model =  baseline_glow(params['model_params'])
+    elif params['architecture'].lower() == "bw":
+        model = baseline_bw(params['model_params'])
+    elif params['architecture'].lower() == "color":
+        model = baseline_color(params['model_params'])
     else:
         raise(ValueError("Model architecture is not defined"))
     if params["model_params"].get("pretrain_cond", False):
         del model.cond_net
-        model.cond_net = AutoEncoder(params["model_params"]["encoder_sizes"], params["model_params"]["decoder_sizes"]).encoder
+        model.cond_net = AutoEncoder(params["model_params"]["encoder_sizes"], params["model_params"]["decoder_sizes"], bw = params['model_params'].get("bw")).encoder
     return model
 
 
@@ -28,7 +32,7 @@ def random_orthog(n):
 
 def sub_conv(ch_hidden, kernel, num_hidden_layers=0, num_classes=0, batchnorm=True):
     pad = kernel // 2
-    if batchnorm: 
+    if batchnorm:
         if num_classes < 2:
             bn = lambda ch_out: nn.BatchNorm2d(ch_out)
         else:
@@ -63,6 +67,226 @@ def sub_fc(ch_hidden, num_hidden_layers=0, dropout=0.0, num_classes=0, batchnorm
         nn.Dropout(p=dropout),
         bn(ch_out)
     )
+
+
+def baseline_color(m_params):
+    if not m_params['permute'] in ['soft', 'random', 'none', 'false', None, False]:
+        raise (RuntimeError("Erros in model params: No 'permute'' selected or not understood."))
+    if not m_params['act_norm'] in ['learnednorm', 'movingavg', 'none', 'false', None, False]:
+        raise (RuntimeError("Erros in model params: No 'act_norm' selected or not understood."))
+
+    cond = CondNet(m_params)
+
+    nodes = [Ff.InputNode(2, 64, 64)]
+    # outputs of the cond. net at different resolution levels
+    conditions = [Ff.ConditionNode(64, 64, 64),
+                  Ff.ConditionNode(128, 32, 32),
+                  Ff.ConditionNode(128, 16, 16),
+                  Ff.ConditionNode(512)]
+
+    split_nodes = []
+    for k in range(m_params['blocks_per_group'][0]):
+        nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
+                             {'subnet_constructor': sub_conv(64, m_params['kernel_size_per_group'][0],
+                                                             m_params['hidden_layers_per_group'][0], batchnorm=m_params.get("bn", True)),
+                              'clamp': m_params['clamping_per_group'][0]},
+                             conditions=conditions[0],
+                             name=F'block_{k}'))
+        if m_params['permute'] == 'random':
+            nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        elif m_params['permute'] == 'soft':
+            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(2)}))
+        if m_params['act_norm'] == 'learnednorm':
+            nodes.append(Ff.Node(nodes[-1], LearnedActNorm, {'M': torch.randn(1), "b": torch.randn(1)}))
+        elif m_params['act_norm'] == 'movingavg':
+            nodes.append(Ff.Node(nodes[-1], Fm.ActNorm, {}))
+
+
+    nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
+
+    for k in range(m_params['blocks_per_group'][1]):
+        nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
+                              {
+                                 'subnet_constructor': sub_conv(128, m_params['kernel_size_per_group'][1],
+                                                                m_params['hidden_layers_per_group'][1], batchnorm=m_params.get("bn", True)),
+                                 'clamp': m_params['clamping_per_group'][1],
+                             },
+                             conditions=conditions[1],
+                             name=F'block_{k + 2}'))
+        if m_params['permute'] == 'random':
+            nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        elif m_params['permute'] == 'soft':
+            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(8)}))
+        if m_params['act_norm'] == 'learnednorm':
+            nodes.append(Ff.Node(nodes[-1], LearnedActNorm, {'M': torch.randn(1), "b": torch.randn(1)}))
+        elif m_params['act_norm'] == 'movingavg':
+            nodes.append(Ff.Node(nodes[-1], Fm.ActNorm, {}))
+
+
+    # split off 8/12 ch
+    if m_params.get("split", True):
+        nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
+                             {'split_size_or_sections': [6, 2], 'dim': 0}))
+        split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
+
+    nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
+
+    for k in range(m_params['blocks_per_group'][2]):
+        nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
+                             {
+                                 'subnet_constructor': sub_conv(256, m_params['kernel_size_per_group'][2][k],
+                                                                m_params['hidden_layers_per_group'][2], batchnorm=m_params.get("bn", True)),
+                                 'clamp': m_params['clamping_per_group'][2],
+                             },
+                             conditions=conditions[2],
+                             name=F'block_{k + 6}'))
+        if m_params['permute'] == 'random':
+            nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        elif m_params['permute'] == 'soft':
+            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(24 if m_params.get("split", True) else 32)}))
+        if m_params['act_norm'] == 'learnednorm':
+            nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        elif m_params['act_norm'] == 'movingavg':
+            nodes.append(Ff.Node(nodes[-1], Fm.ActNorm, {}))
+
+
+    # split off 8/16 ch
+    if m_params.get("split", True):
+        nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
+                             {'split_size_or_sections': [12, 12], 'dim': 0}))
+        split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
+    nodes.append(Ff.Node(nodes[-1], Fm.Flatten, {}, name='flatten'))
+
+    # fully_connected part
+    for k in range(m_params['blocks_per_group'][3]):
+        nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
+                             {
+                                 'clamp': m_params['clamping_per_group'][3],
+                                 'subnet_constructor': sub_fc(m_params['fc_size'], m_params['hidden_layers_per_group'][3], dropout=m_params['dropout_fc'], batchnorm=m_params.get("bn", True))
+                             },
+                             conditions=conditions[3],
+                             name=F'block_{k + 10}'))
+
+        #nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+    # concat everything
+    if m_params.get("split", True):
+        nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
+                         Fm.Concat1d, {'dim': 0}))
+    nodes.append(Ff.OutputNode(nodes[-1]))
+    inn = SketchINN(cond)
+    inn.build_inn(nodes, split_nodes, conditions)
+    return inn
+
+
+def baseline_bw(m_params):
+    if not m_params['permute'] in ['soft', 'random', 'none', 'false', None, False]:
+        raise (RuntimeError("Erros in model params: No 'permute'' selected or not understood."))
+    if not m_params['act_norm'] in ['learnednorm', 'movingavg', 'none', 'false', None, False]:
+        raise (RuntimeError("Erros in model params: No 'act_norm' selected or not understood."))
+
+    cond = CondNet(m_params)
+
+    nodes = [Ff.InputNode(4, 32, 32)]
+    # outputs of the cond. net at different resolution levels
+    conditions = [Ff.ConditionNode(64, 32, 32),
+                  Ff.ConditionNode(128, 16, 16),
+                  Ff.ConditionNode(128, 8, 8),
+                  Ff.ConditionNode(512)]
+
+    split_nodes = []
+    for k in range(m_params['blocks_per_group'][0]):
+        nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
+                             {'subnet_constructor': sub_conv(64, m_params['kernel_size_per_group'][0],
+                                                             m_params['hidden_layers_per_group'][0], batchnorm=m_params.get("bn", True)),
+                              'clamp': m_params['clamping_per_group'][0]},
+                             conditions=conditions[0],
+                             name=F'block_{k}'))
+        if m_params['permute'] == 'random':
+            nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        elif m_params['permute'] == 'soft':
+            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(4)}))
+        if m_params['act_norm'] == 'learnednorm':
+            nodes.append(Ff.Node(nodes[-1], LearnedActNorm, {'M': torch.randn(1), "b": torch.randn(1)}))
+        elif m_params['act_norm'] == 'movingavg':
+            nodes.append(Ff.Node(nodes[-1], Fm.ActNorm, {}))
+
+
+    nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
+
+    for k in range(m_params['blocks_per_group'][1]):
+        nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
+                              {
+                                 'subnet_constructor': sub_conv(128, m_params['kernel_size_per_group'][1],
+                                                                m_params['hidden_layers_per_group'][1], batchnorm=m_params.get("bn", True)),
+                                 'clamp': m_params['clamping_per_group'][1],
+                             },
+                             conditions=conditions[1],
+                             name=F'block_{k + 2}'))
+        if m_params['permute'] == 'random':
+            nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        elif m_params['permute'] == 'soft':
+            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
+        if m_params['act_norm'] == 'learnednorm':
+            nodes.append(Ff.Node(nodes[-1], LearnedActNorm, {'M': torch.randn(1), "b": torch.randn(1)}))
+        elif m_params['act_norm'] == 'movingavg':
+            nodes.append(Ff.Node(nodes[-1], Fm.ActNorm, {}))
+
+
+    # split off 8/12 ch
+    if m_params.get("split", True):
+        nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
+                             {'split_size_or_sections': [6, 10], 'dim': 0}))
+        split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
+
+    nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
+
+    for k in range(m_params['blocks_per_group'][2]):
+        nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
+                             {
+                                 'subnet_constructor': sub_conv(256, m_params['kernel_size_per_group'][2][k],
+                                                                m_params['hidden_layers_per_group'][2], batchnorm=m_params.get("bn", True)),
+                                 'clamp': m_params['clamping_per_group'][2],
+                             },
+                             conditions=conditions[2],
+                             name=F'block_{k + 6}'))
+        if m_params['permute'] == 'random':
+            nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        elif m_params['permute'] == 'soft':
+            nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(24 if m_params.get("split", True) else 64)}))
+        if m_params['act_norm'] == 'learnednorm':
+            nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+        elif m_params['act_norm'] == 'movingavg':
+            nodes.append(Ff.Node(nodes[-1], Fm.ActNorm, {}))
+
+
+    # split off 8/16 ch
+    if m_params.get("split", True):
+        nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
+                             {'split_size_or_sections': [12, 12], 'dim': 0}))
+        split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
+    nodes.append(Ff.Node(nodes[-1], Fm.Flatten, {}, name='flatten'))
+
+    # fully_connected part
+    for k in range(m_params['blocks_per_group'][3]):
+        nodes.append(Ff.Node(nodes[-1], Fm.GLOWCouplingBlock,
+                             {
+                                 'clamp': m_params['clamping_per_group'][3],
+                                 'subnet_constructor': sub_fc(m_params['fc_size'], m_params['hidden_layers_per_group'][3], dropout=m_params['dropout_fc'], batchnorm=m_params.get("bn", True))
+                             },
+                             conditions=conditions[3],
+                             name=F'block_{k + 10}'))
+
+        #nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
+        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
+    # concat everything
+    if m_params.get("split", True):
+        nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
+                         Fm.Concat1d, {'dim': 0}))
+    nodes.append(Ff.OutputNode(nodes[-1]))
+    inn = SketchINN(cond)
+    inn.build_inn(nodes, split_nodes, conditions)
+    return inn
 
 
 def baseline_glow(m_params):
@@ -177,10 +401,13 @@ class CondNet(nn.Module):
 
     def __init__(self, params):
         super().__init__()
-
+        bw_pool = Identity()
+        if params.get("bw"):
+            bw_pool = nn.AvgPool2d(2)
         self.blocks = nn.ModuleList([nn.Sequential(nn.Conv2d(1, 64, 3, padding=1),
                                                    nn.LeakyReLU(),
-                                                   nn.Conv2d(64, 64, 3, padding=1)),
+                                                   nn.Conv2d(64, 64, 3, padding=1),
+                                                   bw_pool),
 
                                      nn.Sequential(nn.LeakyReLU(),
                                                    nn.Conv2d(64, 128, 3, padding=1),
@@ -195,7 +422,7 @@ class CondNet(nn.Module):
                                                    nn.BatchNorm2d(128),
                                                    Flatten(),
                                                    nn.Dropout(params.get("cond_dropout", 0.0)),
-                                                   nn.Linear(2048, 512))
+                                                   nn.Linear(512, 512))
                                      ]
                                     )
 
