@@ -1,20 +1,15 @@
 import torch
-from PIL import Image
-
 import train
-# import model
 import os
 import argparse
 from torchvision import transforms
 import matplotlib.pyplot as plt
-import random
 from architecture import get_model_by_params
 import numpy as np
 import scipy.stats
 from tqdm import tqdm
-import torchvision
 from torchvision.utils import save_image
-import PIL
+
 
 def load_trained_model(folder):
     """
@@ -93,13 +88,9 @@ def latent_gauss(model_name, data, path, bins=50):
     plt.figure()
     print(data.shape)
     hist_data, _ = np.histogram()
-    #plt.title('Model: ' + model_name + ' N= ' + str(data.shape[0]))
     plt.hist(data, bins, range=[-5., 5.], density=True, alpha=0.4)
     plt.boxplot(x, data)
     plt.plot(x, y)
-    #plt.bar(x, bars, alpha=0.4)
-
-
 
     try:
         os.makedirs(os.path.join("generator", model_name))
@@ -156,30 +147,6 @@ def generate_multiple_for_one(device, model_name, args):
     except:
         raise(RuntimeError("Could not flag directory 'pngs' as ready"))
     return os.path.join(path, 'ready_pngs')
-
-
-def generate_from_image(image_name, model_list):
-
-    for model_name in model_list:
-        print('Generate from model {}'.format(model_name))
-        model, split, params = load_trained_model(os.path.join("saved_models", model_name))
-        sketch = Image.open(os.path.join('comparing_generator', image_name))
-
-        sketch = sketch.convert("L")
-        model.eval()
-        with torch.set_grad_enabled(False):
-            tensor_transform = torchvision.transforms.ToTensor()
-            sketch = sketch.resize((64, 64))
-            sketch = tensor_transform(sketch)
-            #sketch = 1 - sketch
-            sketch += 0.002 * torch.randn_like(sketch)
-            sketch = torch.unsqueeze(sketch, 0)
-            for i in range(10):
-                noise = torch.randn(1, 3 * 64 * 64)
-                result = model(x=noise, c=sketch, rev=True).squeeze()
-                trans2 = transforms.ToPILImage()
-                result_img = trans2(result)
-                result_img.save(os.path.join('comparing_generator', "{}_model_{}-{}.png".format(image_name.replace(".", ""), model_name, i)), "PNG")
 
 
 def generate_from_testset(device, model_list):
@@ -291,7 +258,6 @@ if __name__ == "__main__":
     parser.add_argument('--generate', help='Generate from test set', action='store_true')
     parser.add_argument('--sanity', help='Only sanity check, no generation', action='store_true')
     parser.add_argument('--saliencymap', help='Draw saliency map', action='store_true')
-    parser.add_argument('--frompng', help='Generate images from various models to one sketch', action='store_true')
     parser.add_argument('--multiple', help='Generate multiple images from test set for each sketch', action='store_true')
     parser.add_argument('--batchsize', type=int, default=50,
                         help='Batch size to use')
@@ -307,8 +273,7 @@ if __name__ == "__main__":
     if not args.modelnames is None:
         model_list = args.modelnames
     else:
-        print("No model name specified in command line arguments. Will use hard-coded mode list...")
-        model_list = ["default_0710_0g"]
+        raise(RuntimeError("No model name specified in command line arguments."))
 
     if args.multiple:
         generate_multiple_for_one(device, model_list[0], args)
@@ -320,7 +285,5 @@ if __name__ == "__main__":
         generate_from_testset(device, model_list)
     elif args.sanity:
         sanity_check(device, model_list)
-    elif args.frompng:
-        generate_from_image('2325150230_2.png', model_list)
     else:
         generate_from_testset(device, model_list)

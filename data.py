@@ -1,6 +1,4 @@
-from torch.utils.data import Dataset, DataLoader, random_split
-from torch.utils.data.dataset import Subset
-from sklearn.model_selection import KFold
+from torch.utils.data import Dataset
 import logging
 import os
 import torch
@@ -78,9 +76,6 @@ class ImageDataSet(Dataset):
                 for n in self.only_classes:
                     inc[n] = False
             for classfolder in tqdm(folder_iterator, "Processing Sketch Metadata"):
-                #label = self.class_numbers.get(classname)
-                #if label is None:
-                #    logger.error("Warning: Undefined class name {} in data directory {}".format(classname, self.__root_dir))
                 if os.path.isdir(os.path.join(self.__sketch_dir, classfolder.name)) and (self.only_classes==None or classfolder.name in self.only_classes):
                     num_classes += 1
                     inc[classfolder.name] = True
@@ -146,7 +141,6 @@ class ImageDataSet(Dataset):
             print("Processed {} sketches".format(len(self.__meta)))
             folder_iterator.close()
 
-
     def __len__(self):
         return len(self.__meta)
 
@@ -155,17 +149,6 @@ class ImageDataSet(Dataset):
             idx = idx.to(dtype=torch.int)
         meta = self.__meta[idx]
         if self.load_on_request:
-
-            path_sketch = meta.get_sketch()
-            path_real = meta.get_real()
-
-            # Please leave this here, as the dataset in my colab has some duplicates:
-            if path_sketch.endswith(' (1).png'):
-                path_sketch = path_sketch.split(" ")[0] + ".png"
-
-            sketch = Image.open(path_sketch).convert("L")
-            image = Image.open(path_real)
-
             path_sketch = meta.get_sketch()
             path_real = meta.get_real()
 
@@ -200,8 +183,6 @@ class ImageDataSet(Dataset):
             image += self.noise_factor * torch.rand_like(image)
             sketch += self.noise_factor * torch.rand_like(sketch)
 
-            #trans = torchvision.transforms.ToPILImage()
-            #trans(image).show()
         else:
             meta = self.__meta[idx]
             image, sketch = meta.get_images()
@@ -234,6 +215,7 @@ class CompositeIterSingle():
 
     def __len__(self):
         return self.epoch_len# + len(self.loader2)
+
 
 class CompositeDataloader(object):
     def __init__(self, dataloader1, dataloader2, p=0.5, anneal_rate=1):

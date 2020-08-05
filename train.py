@@ -11,7 +11,6 @@ import argparse
 import math
 from torch.utils.data import DataLoader, Subset
 import os
-import torchvision
 import yaml
 from architecture import get_model_by_params
 from datetime import date
@@ -21,6 +20,7 @@ from PIL import ImageFile
 import matplotlib.pyplot as plt
 import socket
 from autoencoder import AutoEncoder
+
 
 def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     """
@@ -36,8 +36,6 @@ def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
     except:
         raise (RuntimeError("Could not load model parameters from " + file_path + "."))
 
-    #if param.get("load_model", False):
-        #param["save_dir"] = os.path.join("saved_models", param["load_model"])
     if create_folder:
         # Find save directory
         if not os.path.exists("saved_models"):
@@ -60,6 +58,7 @@ def parse_yaml(file_path: str, create_folder: bool = True) -> dict:
         raise RuntimeError("No folders can be created in read-only mode.")
 
     return param
+
 
 def get_transform():
     return transforms.Resize((64, 64))
@@ -304,7 +303,6 @@ if __name__ == "__main__":
                 optimizer.step()
             dataloader_train.anneal_p()
             scheduler.step()
-            #scheduler.step(validate(model, dataloader_test))
             np.savetxt(os.path.join(params["save_dir"], 'summary_{}_epoch{}'.format(params["model_name"],  str(epoch))), loss_summary, fmt='%1.3f')
             print("Epoch {} / {} Training Loss: {}, Validation Loss: {}".format(e + 1, params["n_epochs"], epoch_loss, validate(model, dataloader_test)))
 

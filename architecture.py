@@ -5,22 +5,19 @@ import torch.optim
 import FrEIA.framework as Ff
 import FrEIA.modules as Fm
 
-from aiocoupling_fc import AIO_Block as AIOFC
-from aiocoupling_conv import AIO_Block as AIOCONV
 from autoencoder import AutoEncoder
 
 
 def get_model_by_params(params):
     if params['architecture'].lower() == "glow":
         model =  baseline_glow(params['model_params'])
-    elif params['architecture'].lower() == "aio":
-        model = baseline_aio(params['model_params'])
     else:
         raise(ValueError("Model architecture is not defined"))
     if params["model_params"].get("pretrain_cond", False):
         del model.cond_net
         model.cond_net = AutoEncoder(params["model_params"]["encoder_sizes"], params["model_params"]["decoder_sizes"]).encoder
     return model
+
 
 def random_orthog(n):
     w = torch.randn(n, n)
@@ -66,92 +63,6 @@ def sub_fc(ch_hidden, num_hidden_layers=0, dropout=0.0, num_classes=0, batchnorm
         nn.Dropout(p=dropout),
         bn(ch_out)
     )
-
-
-def baseline_aio(m_params):
-    cond = CondNet(m_params)
-
-    nodes = [Ff.InputNode(3, 64, 64)]
-    # outputs of the cond. net at different resolution levels
-    conditions = [Ff.ConditionNode(64, 64, 64),
-                  Ff.ConditionNode(128, 32, 32),
-                  Ff.ConditionNode(128, 16, 16),
-                  Ff.ConditionNode(512)]
-
-    #split_nodes = []
-
-    for k in range(8):
-        nodes.append(Ff.Node(nodes[-1], AIOCONV,
-                             {'subnet_constructor': sub_conv(64, 3, 2),
-                              'clamp': 1.0},
-                             conditions=conditions[0],
-                             name=F'block_{k}'))
-        #nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
-        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(3)}))
-        nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
-
-
-    nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
-
-    for k in range(10):
-        nodes.append(Ff.Node(nodes[-1], AIOCONV,
-                             {
-                                 'subnet_constructor': sub_conv(128, 3, 2),
-                                 'clamp': 0.9,
-                             },
-                             conditions=conditions[1],
-                             name=F'block_{k + 2}'))
-        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
-        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(12)}))
-       # nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
-
-
-    # split off 8/12 ch
-    #nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
-    #                     {'split_size_or_sections': [4, 8], 'dim': 0}))
-    #split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
-
-    nodes.append(Ff.Node(nodes[-1], Fm.HaarDownsampling, {'rebalance': 0.5}))
-
-    for k in range(8):
-        nodes.append(Ff.Node(nodes[-1], AIOCONV,
-                             {
-                                 'subnet_constructor': sub_conv(256, 3 if k%2 else 1, 2),
-                                 'clamp': 1.0,
-                             },
-                             conditions=conditions[2],
-                             name=F'block_{k + 6}'))
-        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
-        #nodes.append(Ff.Node([nodes[-1].out0], Fm.conv_1x1, {'M':random_orthog(16)}))
-        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
-
-
-    # split off 8/16 ch
-    #nodes.append(Ff.Node(nodes[-1], Fm.Split1D,
-    #                     {'split_size_or_sections': [8, 8], 'dim': 0}))
-    #split_nodes.append(Ff.Node(nodes[-1].out1, Fm.Flatten, {}))
-    nodes.append(Ff.Node(nodes[-1], Fm.Flatten, {}, name='flatten'))
-
-    # fully_connected part
-    for k in range(4):
-        nodes.append(Ff.Node(nodes[-1], AIOFC,
-                             {
-                                 'clamp': 0.6,
-                                 'subnet_constructor': sub_fc(1024, 2)
-                             },
-                             conditions=conditions[3],
-                             name=F'block_{k + 10}'))
-
-        nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
-        #nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
-        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
-    # concat everything
-    #nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
-    #                     Fm.Concat1d, {'dim': 0}))
-    nodes.append(Ff.OutputNode(nodes[-1]))
-    inn = SketchINN(cond)
-    inn.build_inn(nodes, split_nodes, conditions)
-    return inn
 
 
 def baseline_glow(m_params):
@@ -252,8 +163,6 @@ def baseline_glow(m_params):
                              conditions=conditions[3],
                              name=F'block_{k + 10}'))
 
-        #nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {'seed': k}))
-        #nodes.append(Ff.Node(nodes[-1], LearnedActNorm , {'M': torch.randn(1), "b": torch.randn(1)}))
     # concat everything
     if m_params.get("split", True):
         nodes.append(Ff.Node([s.out0 for s in split_nodes] + [nodes[-1].out0],
@@ -329,8 +238,9 @@ class Flatten(nn.Module):
 class SubnetConstructorFC(nn.Module):
     """This class constructs a subnet for the inner parts of the GLOWCouplingBlocks
     as well as the condition preprocessor.
+    num_layers: number of layers to be constructed by this instance
     size_in: input size of the subnet
-    size: output size of the subnet
+    size_out: output size of the subnet
     internal_size: hidden size of the subnet. If None, set to 2*size
     dropout: dropout chance of the subnet
     """
@@ -361,8 +271,17 @@ class SubnetConstructorFC(nn.Module):
 
 
 class SubnetConstructorConv(nn.Module):
+    """This class constructs a subnet for the inner parts of the GLOWCouplingBlocks
+        as well as the condition preprocessor.
+        num_layers: number of layers to be constructed by this instance
+        size_in: input size of the subnet
+        in_channels: number of channels accepted as network input
+        out_channels: number of channels to be put out
+        stride: convolution stride
+        conv_size: filter size
+        """
 
-    def __init__(self, num_layers, size_in, in_channels, hidden_channels, out_channels, stride=1, conv_size=3,
+    def __init__(self, num_layers, size_in, in_channels, out_channels, stride=1, conv_size=3,
                  dropout=0.0):
         super().__init__()
         if num_layers < 1:
@@ -398,9 +317,7 @@ class LearnedActNorm(nn.Module):
 
         self.M = nn.Parameter(M, requires_grad=True)
         self.b = nn.Parameter(b, requires_grad=True)
-        #if len(dims_in) > 1:
-        #    self.n_pixels = dims_in[1] * dims_in[2]
-        #else:
+
         self.n_pixels = 1
         self.activation = nn.Softplus(beta=0.5)
 
@@ -415,6 +332,7 @@ class LearnedActNorm(nn.Module):
 
     def output_dims(self, input_dims):
         return input_dims
+
 
 #taken from https://github.com/pytorch/pytorch/issues/8985#issuecomment-405080775
 class ConditionalBatchNorm2d(nn.Module):
@@ -432,6 +350,7 @@ class ConditionalBatchNorm2d(nn.Module):
         out = gamma.view(-1, self.num_features, 1, 1) * out + beta.view(-1, self.num_features, 1, 1)
         return out
 
+
 class ConditionalBatchNorm1d(nn.Module):
     def __init__(self, num_features, num_classes):
         super().__init__()
@@ -446,6 +365,7 @@ class ConditionalBatchNorm1d(nn.Module):
         gamma, beta = self.embed(y).chunk(2, 1)
         out = gamma.view(-1, self.num_features) * out + beta.view(-1, self.num_features)
         return out
+
 
 class Identity(nn.Module):
     def __init__(self, *args, **kwargs):
