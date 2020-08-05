@@ -33,4 +33,7 @@ dataset
  </details>
  
  ## How to generate images from test split of the dataset
- After the training of a model has finished, the used random train-test split is saved to the model parameter file, as well. When evaluating or generating images using a trained model, the corresponding test images will be used in order to maintain a clean data split. Follow these steps for generating images from a trained model:
+After the training of a model has finished, the used random train-test split is saved to the model parameter file, as well. When evaluating or generating images using a trained model, the corresponding test images will be used in order to maintain a clean data split. Follow these steps for generating images from a trained model: 
+1. Search for the name of the model you want to use in the ``saved_models``directory.
+2. Use this model name to call ``python3 generator.py modelname --generate``.
+3. The generated images are stores in the ``generator/modelname``directory.
