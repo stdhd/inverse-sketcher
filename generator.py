@@ -11,6 +11,7 @@ from tqdm import tqdm
 from torchvision.utils import save_image
 import PIL
 from skimage import io, color
+import matplotlib
 
 scale = (25.6, 11.2, 16.8)
 bias =  (47.5, 2.4, 7.4)
@@ -90,12 +91,18 @@ def latent_gauss(model_name, data, path, bins=50):
     x = np.linspace(-5, 5, bins)
     y = scipy.stats.norm.pdf(x, 0, 1)
     plt.figure()
+    matplotlib.rc('text', usetex=True)
+    matplotlib.rc('font', **{'family': "sans-serif"})
+    params = {'text.latex.preamble': [r'\usepackage{siunitx}',
+                                      r'\usepackage{sfmath}', r'\sisetup{detect-family = true}',
+                                      r'\usepackage{amsmath}']}
+    plt.rcParams.update(params)
     #plt.hist(data, bins, range=[-5., 5.], density=True, alpha=0.4)
     #plt.boxplot(x, data)
-    plt.plot(x, y)
+    plt.plot(x, y, label=r"$\mu = 0, \sigma ^2 = 1$")
     # plt.hist gives you the entries, edges
     # and drawables we do not need the drawables:
-    entries, edges, _ = plt.hist(data.reshape(data.shape[0] * data.shape[1]), bins=bins, range=[-5, 5], density=True, color='gray')
+    entries, edges, _ = plt.hist(data.reshape(data.shape[0] * data.shape[1]), bins=bins, range=[-5, 5], density=True, color='gray', label='Latent distribution of all color values')
 
     # create histograms for all indivisual pixels
     histograms = np.zeros((data.shape[1], bins))
@@ -105,8 +112,9 @@ def latent_gauss(model_name, data, path, bins=50):
     std_devs = np.std(histograms, axis=0)
     # calculate bin centers
     bin_centers = 0.5 * (edges[:-1] + edges[1:])
-    plt.errorbar(bin_centers, entries, yerr=std_devs, fmt='.', elinewidth=0.2, markersize=0.2)
+    plt.errorbar(bin_centers, entries, yerr=std_devs, fmt='.', elinewidth=0.4, markersize=0.2, label=r"Standard deviation across histograms \\ \textit{on every color value}")
 
+    plt.legend()
     try:
         os.makedirs(os.path.join("generator", model_name))
     except:
@@ -374,12 +382,10 @@ def sanity_check(device, model_list):
             for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(dataloader_train):
                 batch_conditions, batch_inputs = batch_conditions.to(device), batch_inputs.to(device)
                 sanity_check = model(x=batch_inputs, c=batch_conditions, rev=False)
-                print(sanity_check.size())
-
                 sanity_data = np.concatenate((sanity_data, sanity_check.cpu().detach().numpy()))
 
             # Plot sanity check data
-                break
+                #break
 
            # sanity_data = np.mean(sanity_data, axis=0)
 
