@@ -84,18 +84,28 @@ def saliency_map(device, model_list):
                     bbox_inches='tight')
                 plt.close(fig)
 
-
 def latent_gauss(model_name, data, path, bins=50):
     plt.figure(figsize=[10., 5.])
 
     x = np.linspace(-5, 5, bins)
     y = scipy.stats.norm.pdf(x, 0, 1)
     plt.figure()
-    print(data.shape)
-    hist_data, _ = np.histogram()
-    plt.hist(data, bins, range=[-5., 5.], density=True, alpha=0.4)
-    plt.boxplot(x, data)
+    #plt.hist(data, bins, range=[-5., 5.], density=True, alpha=0.4)
+    #plt.boxplot(x, data)
     plt.plot(x, y)
+    # plt.hist gives you the entries, edges
+    # and drawables we do not need the drawables:
+    entries, edges, _ = plt.hist(data.reshape(data.shape[0] * data.shape[1]), bins=bins, range=[-5, 5], density=True, color='gray')
+
+    # create histograms for all indivisual pixels
+    histograms = np.zeros((data.shape[1], bins))
+    for i in range(data.shape[1]):
+        histograms[i], _ = np.histogram(data[:, i], bins=bins, density=True)
+
+    std_devs = np.std(histograms, axis=0)
+    # calculate bin centers
+    bin_centers = 0.5 * (edges[:-1] + edges[1:])
+    plt.errorbar(bin_centers, entries, yerr=std_devs, fmt='.', elinewidth=0.2, markersize=0.2)
 
     try:
         os.makedirs(os.path.join("generator", model_name))
@@ -359,16 +369,20 @@ def sanity_check(device, model_list):
         model.to(device)
 
         with torch.set_grad_enabled(False):
-            sanity_data = np.array([])
+            sanity_data = np.array([]).reshape(0, 12288)
 
             for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(dataloader_train):
                 batch_conditions, batch_inputs = batch_conditions.to(device), batch_inputs.to(device)
                 sanity_check = model(x=batch_inputs, c=batch_conditions, rev=False)
+                print(sanity_check.size())
 
-                sanity_data = np.append(sanity_data, sanity_check.cpu().detach().numpy()[:, ..., 3])
+                sanity_data = np.concatenate((sanity_data, sanity_check.cpu().detach().numpy()))
 
             # Plot sanity check data
                 break
+
+           # sanity_data = np.mean(sanity_data, axis=0)
+
             latent_gauss(model_name, sanity_data, "")
 
 
