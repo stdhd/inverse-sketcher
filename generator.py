@@ -102,7 +102,7 @@ def latent_gauss(model_name, data, path, bins=50):
     plt.plot(x, y, label=r"$\mu = 0, \sigma ^2 = 1$")
     # plt.hist gives you the entries, edges
     # and drawables we do not need the drawables:
-    entries, edges, _ = plt.hist(data.reshape(data.shape[0] * data.shape[1]), bins=bins, range=[-5, 5], density=True, color='gray', label='Latent distribution of all color values')
+    entries, edges, _ = plt.hist(data.reshape(data.shape[0] * data.shape[1]), bins=bins, range=[-5, 5], density=True, color='gray', label='Latent distribution of all pixel-color values')
 
     # create histograms for all indivisual pixels
     histograms = np.zeros((data.shape[1], bins))
@@ -112,15 +112,16 @@ def latent_gauss(model_name, data, path, bins=50):
     std_devs = np.std(histograms, axis=0)
     # calculate bin centers
     bin_centers = 0.5 * (edges[:-1] + edges[1:])
-    plt.errorbar(bin_centers, entries, yerr=std_devs, fmt='.', elinewidth=0.4, markersize=0.2, label=r"Standard deviation across histograms \\ \textit{on every color value}")
-
-    plt.legend()
+    plt.errorbar(bin_centers, entries, yerr=std_devs, fmt='.', elinewidth=0.4, markersize=0.2, label=r"Standard deviation across histograms \textit{on every pixel-color value}")
+    plt.xlabel('Latent space value')
+    plt.ylabel('Frequency')
+    lgd = plt.legend(bbox_to_anchor=(0.5,-0.2), loc='upper center', borderaxespad=0.)
     try:
         os.makedirs(os.path.join("generator", model_name))
     except:
         print("generate folder exists, so plot is overwritten")
 
-    plt.savefig(os.path.join("generator", model_name, "GaussianLatent_all.pdf"))
+    plt.savefig(os.path.join("generator", model_name, "GaussianLatent_all.pdf"), bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.close()
 
 def generate_multiple_for_one(device, model_name, args):
@@ -385,7 +386,7 @@ def sanity_check(device, model_list):
                 sanity_data = np.concatenate((sanity_data, sanity_check.cpu().detach().numpy()))
 
             # Plot sanity check data
-                #break
+                break
 
            # sanity_data = np.mean(sanity_data, axis=0)
 
