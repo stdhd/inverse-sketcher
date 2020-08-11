@@ -44,6 +44,11 @@ def load_trained_model(folder):
 
 
 def saliency_map(device, model_list):
+    """
+    Generates maps of gradients when backpropagating back to the condition (sketch), saves resulting plots in generator/modelname
+    :param device: gpu/cpu
+    :param model_list: List of models to create saliency maps for
+    """
     for model_name in model_list:
         print('Saliency map from model {}'.format(model_name))
         try:
@@ -85,7 +90,15 @@ def saliency_map(device, model_list):
                     bbox_inches='tight')
                 plt.close(fig)
 
-def latent_gauss(model_name, data, path, bins=50):
+
+def latent_gauss(model_name, data, bins=50):
+    """
+    Create and save plot combining Gaussian standard normal distribution as reference, histogram of distribution in 'data',
+    including standard deviations of histogram bars for histograms calculated per color-pixel location
+    :param model_name: Folder in generator/ to store resulting pdf
+    :param data: Numpy array of shape [number samples, 64*64*3]
+    :param bins: Number of histogram bins to plot
+    """
     plt.figure(figsize=[10., 5.])
 
     x = np.linspace(-5, 5, bins)
@@ -97,19 +110,17 @@ def latent_gauss(model_name, data, path, bins=50):
                                       r'\usepackage{sfmath}', r'\sisetup{detect-family = true}',
                                       r'\usepackage{amsmath}']}
     plt.rcParams.update(params)
-    #plt.hist(data, bins, range=[-5., 5.], density=True, alpha=0.4)
-    #plt.boxplot(x, data)
+
     plt.plot(x, y, label=r"$\mu = 0, \sigma ^2 = 1$")
-    # plt.hist gives you the entries, edges
-    # and drawables we do not need the drawables:
     entries, edges, _ = plt.hist(data.reshape(data.shape[0] * data.shape[1]), bins=bins, range=[-5, 5], density=True, color='gray', label='Latent distribution of all pixel-color values')
 
-    # create histograms for all indivisual pixels
+    # create histograms for all individual pixels
     histograms = np.zeros((data.shape[1], bins))
     for i in range(data.shape[1]):
         histograms[i], _ = np.histogram(data[:, i], bins=bins, density=True)
 
     std_devs = np.std(histograms, axis=0)
+
     # calculate bin centers
     bin_centers = 0.5 * (edges[:-1] + edges[1:])
     plt.errorbar(bin_centers, entries, yerr=std_devs, fmt='.', elinewidth=0.4, markersize=0.2, label=r"Standard deviation across histograms \textit{on every pixel-color value}")
@@ -124,7 +135,14 @@ def latent_gauss(model_name, data, path, bins=50):
     plt.savefig(os.path.join("generator", model_name, "GaussianLatent_all.pdf"), bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.close()
 
+
 def generate_multiple_for_one(device, model_name, args):
+    """
+    Generate multiple images for each sketch in test data, save generate results in generate_multiple_per_sketch/modelname
+    :param device: gpu/cpu
+    :param model_name: Name of model to generate with
+    :param args: Command line arguments are passed, to extract batch size from
+    """
     model, split, params = load_trained_model(os.path.join("saved_models", model_name))
     path = os.path.join('generate_multiple_per_sketch', model_name)
     save_path = os.path.join(path, 'pngs')
@@ -147,7 +165,7 @@ def generate_multiple_for_one(device, model_name, args):
         load_on_request=True
     )
     model.to(device)
-    count = 1
+
     with torch.set_grad_enabled(False):
         for batch_no, (batch_conditions, batch_inputs, batch_labels) in enumerate(
                 tqdm(dataloader_test, "Visualization")):
@@ -174,12 +192,17 @@ def generate_multiple_for_one(device, model_name, args):
 
 
 def generate_from_testset(device, model_list):
+    """
+    Generate for each sketch in test data a image and presenting sketch, generated image, true image together in pdf file.
+    :param device: gpu/cpu
+    :param model_list: List of models to generate from
+    """
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
 
         dataloader_train, dataloader_test, ___, test_split = train.create_dataloaders(
-            params["data_path"], #"dataset/edges2shoes/",
+            params["data_path"],
             params["batch_size"],
             params["test_ratio"],
             only_classes=params.get("only_classes", None),
@@ -240,8 +263,8 @@ def generate_from_testset(device, model_list):
                     generated_image = transforms.ToPILImage()(gen[i].cpu().detach()).convert("RGB")
                     original = transforms.ToPILImage()(true[i].cpu().detach()).convert("RGB")
                     axes[i % 3, 0].imshow(condition_image, cmap='gray')
-                    axes[i % 3, 1].imshow(generated_image)#, cmap="gray")
-                    axes[i % 3, 2].imshow(original)#, cmap="gray")
+                    axes[i % 3, 1].imshow(generated_image)
+                    axes[i % 3, 2].imshow(original)
 
                     axes[i % 3, 0].axis('off')
                     axes[i % 3, 1].axis('off')
@@ -256,7 +279,13 @@ def generate_from_testset(device, model_list):
                     if i == batch_inputs.shape[0]:
                         plt.close(fig)
 
+
 def generate_combined(device, model_list):
+    """
+    Generating images from trained models for black-and-white image generation before coloration with the second model
+    :param device: gpu/cpu
+    :param model_list: Tuple(model name of black-and-white generator, model name of coloration generator)
+    """
     print('Combining bw model {} and color model {}'.format(model_list[0], model_list[1]))
     model, split, params = load_trained_model(os.path.join("saved_models", model_list[0]))
 
@@ -344,8 +373,8 @@ def generate_combined(device, model_list):
                 generated_image = transforms.ToPILImage()(gen[i].cpu().detach()).convert("RGB")
                 original = transforms.ToPILImage()(true[i].cpu().detach()).convert("RGB")
                 axes[i % 3, 0].imshow(condition_image, cmap='gray')
-                axes[i % 3, 1].imshow(generated_image)#, cmap="gray")
-                axes[i % 3, 2].imshow(original)#, cmap="gray")
+                axes[i % 3, 1].imshow(generated_image)
+                axes[i % 3, 2].imshow(original)
 
                 axes[i % 3, 0].axis('off')
                 axes[i % 3, 1].axis('off')
@@ -362,6 +391,11 @@ def generate_combined(device, model_list):
 
 
 def sanity_check(device, model_list):
+    """
+    Generating data from models in list before plotting latent space distribution
+    :param device: cuda/cpu
+    :param model_list: List of models to generate samples from
+    """
     for model_name in model_list:
         print('Generate from model {}'.format(model_name))
         model, split, params = load_trained_model(os.path.join("saved_models", model_name))
@@ -385,12 +419,8 @@ def sanity_check(device, model_list):
                 sanity_check = model(x=batch_inputs, c=batch_conditions, rev=False)
                 sanity_data = np.concatenate((sanity_data, sanity_check.cpu().detach().numpy()))
 
-            # Plot sanity check data
-                #break
 
-           # sanity_data = np.mean(sanity_data, axis=0)
-
-            latent_gauss(model_name, sanity_data, "")
+            latent_gauss(model_name, sanity_data)
 
 
 def load_checkpoint(filepath):
