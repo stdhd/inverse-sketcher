@@ -386,7 +386,7 @@ def sanity_check(device, model_list):
                 sanity_data = np.concatenate((sanity_data, sanity_check.cpu().detach().numpy()))
 
             # Plot sanity check data
-                break
+                #break
 
            # sanity_data = np.mean(sanity_data, axis=0)
 
