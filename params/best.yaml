@@ -1,0 +1,10 @@
+{architecture: glow, batch_size: 15, data_path: dataset/ShoeV2_F, load_model: true,
+  model_name: glow_v2_ae, model_params: {act_norm: movingavg, blocks_per_group: [
+      12, 12, 12, 6], clamping_per_group: [1.0, 1.0, 1.0, 0.6], cond_dropout: 0.3,
+    conv_size: 3, conv_size_cond: 3, decoder_sizes: [1, 2, 2, 2], dim_cond: [1, 256,
+      256], dim_cond_out: [3, 256, 256], dim_x: [3, 256, 256], dropout_fc: 0, encoder_sizes: [
+      2, 2, 2, 1], fc_size: 1024, hidden_layers_per_group: [2, 3, 2, 2], kernel_size_per_group: [
+      3, 3, [3, 3, 1, 3, 3, 1, 3, 3, 1, 3, 1, 3]], layers_per_block: 4, n_blocks: 20,
+    num_cond_layers: 3, permute: soft, pretrain_cond: true}, n_epochs: 400, optimizer: Adam,
+  optimizer_params: {lr: 0.0002, weight_decay: 1.0e-05}, save_dir: saved_models/glow_v2_ae_0716_7,
+  test_ratio: 0.1}
