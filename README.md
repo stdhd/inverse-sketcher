@@ -57,7 +57,7 @@ After the training of a model has finished, the used random train-test split is 
 **generator.py** can be used to let a trained model generate images.
 
 
-You can call ``python3 train.py --help`` to see accepted command line parameters for *train.py*, *metrics_wrapper.py* and *generator.py*.
+You can call ``python3 train.py --help`` to see accepted command line parameters. This is possible for *train.py*, *metrics_wrapper.py* and *generator.py*.
 
 
 ## Visit our demo:
