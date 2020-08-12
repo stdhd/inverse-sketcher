@@ -46,7 +46,7 @@ After the training of a model has finished, the used random train-test split is 
 3. The generated images are stored in the ``generator/modelname``directory.
 
 ## Brief code overview
-**train.py** is used to initialize training procedure.
+**train.py** is used to initialize training procedures.
 
 **data.py** contains dataset implementation and preprocessing.
 
