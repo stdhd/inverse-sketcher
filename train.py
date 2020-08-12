@@ -194,7 +194,12 @@ def validate(model, dataloader_test):
     model.train()
     return val_loss
 
+
 def train_ae(encoder_sizes, decoder_sizes, train_loader, num_epochs=1, bw=False):
+    """
+    Pre-train Autoencoder on condition sketches
+    :return trained encoder nn.Module
+    """
     AE = AutoEncoder(encoder_sizes, decoder_sizes, bw=bw).to(device)
     optimizer = torch.optim.Adam(AE.parameters(), lr=0.0005, weight_decay=3e-6)
     for epoch in tqdm(range(num_epochs), "Encoder pretraining"):
@@ -212,6 +217,7 @@ def train_ae(encoder_sizes, decoder_sizes, train_loader, num_epochs=1, bw=False)
     optimizer.zero_grad()
     del optimizer
     return AE.encoder
+
 
 if __name__ == "__main__":
     # Determine, whether cuda will be enabled

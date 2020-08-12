@@ -1,3 +1,4 @@
+# Taken from https://github.com/mseitzer/pytorch-fid, see LICENSE_FID file
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

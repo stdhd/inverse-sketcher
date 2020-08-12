@@ -29,10 +29,13 @@ parser.add_argument('--filecount', type=int, default=-1,
                     help='Number of files to create max. -1 (default) means no limit.')
 
 scale = (25.6, 11.2, 16.8)
-bias =  (47.5, 2.4, 7.4)
+bias = (47.5, 2.4, 7.4)
 
 
 def generate_pngs(device, model_name, args):
+    """
+    Generate and save images given model's test split
+    """
     model, split, params = load_trained_model(os.path.join("saved_models", model_name))
     path = os.path.join('generator', model_name)
     save_path = os.path.join(path, 'pngs')
@@ -103,6 +106,9 @@ def generate_pngs(device, model_name, args):
 
 
 def generate_combined(device, args):
+    """
+    Generate and save using shape prediction and colorization models separately
+    """
     model_list = args.modelnames
     print('Combining bw model {} and color model {}'.format(model_list[0], model_list[1]))
     model, split, params = load_trained_model(os.path.join("saved_models", model_list[0]))
@@ -149,7 +155,7 @@ def generate_combined(device, args):
             gen_bw.append(gen)
             images_bw.append(batch_inputs)
             orig_cond.append(batch_conditions)
-    #gen_bw, images_bw = torch.cat(gen_bw, dim = 0), torch.cat(images_bw, dim = 0)
+
     print("Coloring Images")
     model, split, params = load_trained_model(os.path.join("saved_models", model_list[1]))
     model.to(device)
@@ -202,7 +208,6 @@ def generate_combined(device, args):
     return os.path.join(path, 'ready_pngs')
 
 
-
 if __name__ == "__main__":
     args = parser.parse_args()
     if not args.nocuda and torch.cuda.is_available():
@@ -235,9 +240,6 @@ if __name__ == "__main__":
         if not args.nois:
             dataset = torchvision.datasets.ImageFolder(root="/".join(path.split("/")[:-1]),
                                                        transform=torchvision.transforms.ToTensor())
-            #Calculate IS of dataset as reference (generated IS should not exceed dataset IS)
-            #dataset = torchvision.datasets.ImageFolder(root=os.path.join(reference_path),
-            #                                           transform=torchvision.transforms.ToTensor())
             print("Calculating inception score for Model {}...".format(model_name))
             is_value_mean, is_value_std = inception_score(dataset, device==torch.device('cuda'), args.batchsize, resize=True)
             print("IS: mean, std", is_value_mean, " ", is_value_std)

@@ -78,7 +78,6 @@ def saliency_map(device, model_list):
                 loss = torch.mean(generated ** 2 / 2) - torch.mean(model.log_jacobian()) / generated.shape[1]
                 loss.backward()
                 saliency = condition.grad.data.abs()
-                # create heatmap
                 fig, ax = plt.subplots(1, 2)
                 ax[0].imshow(condition.squeeze().detach().numpy(), cmap='Greys')
                 ax[0].imshow(saliency[0].squeeze().detach().numpy(), cmap='Reds', alpha=0.4)
@@ -329,7 +328,7 @@ def generate_combined(device, model_list):
 
             if batch_no > 9:
                 break
-    #gen_bw, images_bw = torch.cat(gen_bw, dim = 0), torch.cat(images_bw, dim = 0)
+
     print("Coloring Images")
     model, split, params = load_trained_model(os.path.join("saved_models", model_list[1]))
     model.to(device)
@@ -418,7 +417,7 @@ def sanity_check(device, model_list):
                 batch_conditions, batch_inputs = batch_conditions.to(device), batch_inputs.to(device)
                 sanity_check = model(x=batch_inputs, c=batch_conditions, rev=False)
                 sanity_data = np.concatenate((sanity_data, sanity_check.cpu().detach().numpy()))
-
+                break
 
             latent_gauss(model_name, sanity_data)
 

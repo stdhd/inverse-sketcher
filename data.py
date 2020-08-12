@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class ImageMetaData(object):
+    """
+    Class to store paths of sketch and corresponding true image
+    """
 
     def __init__(self, path_sketch, path_real, label, real=None, sketch=None):
         self.__label = label
@@ -74,7 +77,6 @@ class ImageDataSet(Dataset):
         self.__class_dict = dict
 
     def __process_meta(self):
-        #class1, class2, ...
         tensor_transform = torchvision.transforms.ToTensor()
         with os.scandir(self.__sketch_dir) as folder_iterator:
             num_classes = 0
@@ -170,10 +172,6 @@ class ImageDataSet(Dataset):
             path_sketch = meta.get_sketch()
             path_real = meta.get_real()
 
-            # Please leave this here, as the dataset in my colab has some duplicates:
-            if path_sketch.endswith(' (1).png'):
-                path_sketch = path_sketch.split(" ")[0] + ".png"
-
             sketch = Image.open(path_sketch)
             if np.asarray(sketch).shape[-1] == 4:
                 sketch = torchvision.transforms.ToPILImage()(torch.from_numpy(np.asarray(sketch)[:,:,-1]))
@@ -201,7 +199,7 @@ class ImageDataSet(Dataset):
                 image = color.rgb2lab(image).transpose((2, 0, 1))
                 for i in range(3):
                     image[i] = (image[i] - self.bias[i]) / self.scale[i]
-                image = torch.Tensor(image)            #Make the background pixels black and brushstroke pixels white
+                image = torch.Tensor(image)
             if sub:
                 sketch = (1 - sketch)
 
@@ -214,8 +212,6 @@ class ImageDataSet(Dataset):
                 image = torch.stack([image[::2, ::2], image[1::2, ::2], image[::2, 1::2], image[1::2, 1::2],], dim = 0)
             if self.color:
                 return image[0].unsqueeze(0), image[1:], meta.get_class()
-            #trans = torchvision.transforms.ToPILImage()
-            #trans(image).show()
 
         else:
             meta = self.__meta[idx]
@@ -249,7 +245,7 @@ class CompositeIterSingle():
             return self.loader1.__next__()
 
     def __len__(self):
-        return self.epoch_len# + len(self.loader2)
+        return self.epoch_len
 
 
 class CompositeDataloader(object):

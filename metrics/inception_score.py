@@ -1,4 +1,4 @@
-# TODO: Taken from https://github.com/sbarratt/inception-score-pytorch, add correct credits
+# Taken from https://github.com/sbarratt/inception-score-pytorch, see LICENSE_IS file
 import torch
 from torch import nn
 from torch.autograd import Variable

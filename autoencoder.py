@@ -44,7 +44,6 @@ class Encoder(nn.Module):
                                      ]
                                     )
 
-
     def forward(self, x):
         outputs = [x]
         for m in self.blocks:
@@ -84,6 +83,7 @@ class Decoder(nn.Module):
             outputs.append(m(outputs[-1]))
         return outputs[1:]
 
+
 class View(nn.Module):
     def __init__(self, shape):
         super().__init__()
@@ -92,12 +92,14 @@ class View(nn.Module):
     def forward(self, input):
         return input.view(*self.shape)
 
+
 class Flatten(nn.Module):
     def __init__(self, *args):
         super().__init__()
 
     def forward(self, x):
         return x.view(x.shape[0], -1)
+
 
 class Unpooling(nn.Module):
     def __init__(self, size):
@@ -108,8 +110,10 @@ class Unpooling(nn.Module):
         ind = torch.ones(x.shape).to(x.device, dtype=torch.int64)
         return self.maxunp(x, ind)
 
+
 class Identity(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
+
     def forward(self, x):
         return x

@@ -1,4 +1,4 @@
-# TODO: Taken from https://github.com/mseitzer/pytorch-fid, add correct credits
+# Taken from https://github.com/mseitzer/pytorch-fid, see LICENSE_FID file
 #!/usr/bin/env python3
 """Calculates the Frechet Inception Distance (FID) to evalulate GANs
 
@@ -118,9 +118,7 @@ def get_activations(files, model, batch_size=50, dims=2048,
         # Reshape to (n_images, 3, height, width)
         images = images.transpose((0, 3, 1, 2))
         images /= 255
-        #if images are black and white
-        #batch = torch.from_numpy(images).type(torch.FloatTensor)
-        #batch = torch.mean(batch, dim=1, keepdims=True).repeat(1, 3, 1, 1)
+
         if cuda:
             batch = batch.cuda()
 
