@@ -44,3 +44,6 @@ After the training of a model has finished, the used random train-test split is 
 1. Search for the name of the model you want to use in the ``saved_models``directory.
 2. Use this model name to call ``python3 generator.py modelname --generate``.
 3. The generated images are stored in the ``generator/modelname``directory.
+
+## Visit our demo:
+https://sketcher.treted.de
