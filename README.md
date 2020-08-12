@@ -45,5 +45,20 @@ After the training of a model has finished, the used random train-test split is 
 2. Use this model name to call ``python3 generator.py modelname --generate``.
 3. The generated images are stored in the ``generator/modelname``directory.
 
+## Brief code overview
+**train.py** is used to initialize training procedure.
+
+**data.py** contains dataset implementation and preprocessing.
+
+**architecture.py** builds cINN structure. Our Autoencoder extension is build by **autoencoder.py**, instead. 
+
+**metrics_wrapper.py** is meant to call evaluation procedures.
+
+**generator.py** can be used to let a trained model generate images.
+
+
+You can call ``python3 train.py --help`` to see accepted command line parameters for *train.py*, *metrics_wrapper.py* and *generator.py*.
+
+
 ## Visit our demo:
 https://sketcher.treted.de
